@@ -162,12 +162,13 @@ export function saveRequest(directory, { brief, count = 10 }) {
   if (!Number.isInteger(count) || count < 1 || count > 30) throw new Error('Choose between 1 and 30 tracks.');
   const id = new Date().toISOString().replace(/[:.]/g, '-') + '-' + crypto.randomBytes(3).toString('hex');
   const request = { id, brief: brief.trim(), count, date: new Date().toISOString(), status: 'pending', path: `requests/${id}.json` };
-  writeJson(path.join(libraryPath(directory), request.path), request); return request;
+  writeJson(path.join(libraryPath(directory), request.path), request);
+  return { ...request, path: path.join(libraryPath(directory), request.path) };
 }
 export function readRequests(directory) {
   const dir = path.join(libraryPath(directory), 'requests');
   if (!fs.existsSync(dir)) return [];
-  return fs.readdirSync(dir).filter(n => n.endsWith('.json')).sort().reverse().map(n => readJson(path.join(dir, n)));
+  return fs.readdirSync(dir).filter(n => n.endsWith('.json')).sort().reverse().map(n => ({ ...readJson(path.join(dir, n)), path: path.join(dir, n) }));
 }
 
 export function trackInfo(directory, id, { detail = false } = {}) {

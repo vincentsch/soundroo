@@ -27,7 +27,7 @@ export async function createSpeech(text, outFile, { voice = 'af_heart', dtype = 
   let KokoroTTS, env;
   try { ({ KokoroTTS } = await import('kokoro-js')); ({ env } = await import('@huggingface/transformers')); }
   catch (error) {
-    if (error.code === 'ERR_MODULE_NOT_FOUND') throw new Error('Optional speech runtime is not installed. From the Soundroo source folder run: npm install --no-save kokoro-js@1.2.1 @huggingface/transformers@3.8.1');
+    if (error.code === 'ERR_MODULE_NOT_FOUND') throw new Error('Optional speech runtime is not installed. From the Soundroo source folder run: npm install --no-save --package-lock=false kokoro-js@1.2.1 @huggingface/transformers@3.8.1');
     throw error;
   }
   env.cacheDir = cacheDir ?? path.join(process.env.SOUNDROO_CACHE ?? path.join(os.homedir(), '.cache', 'soundroo'), 'models');

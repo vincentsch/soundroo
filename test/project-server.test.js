@@ -38,8 +38,8 @@ test('studio persists listening feedback/favorites/requests and serves seekable 
     assert.equal(detail.favorite, true); assert.equal(detail.feedback[0].time, 0.5);
     assert.equal(detail.feedback[0].text, 'Make this section quieter.');
     const request = await (await call('/api/requests', { brief: 'Ten quiet pieces for a rainy evening.', count: 10 })).json();
-    assert.equal(request.request.count, 10); assert.ok(fs.existsSync(path.join(directory, request.request.path)));
-    const requests = await (await call('/api/requests')).json(); assert.equal(requests.requests.length, 1);
+    assert.equal(request.request.count, 10); assert.ok(path.isAbsolute(request.request.path)); assert.ok(fs.existsSync(request.request.path));
+    const requests = await (await call('/api/requests')).json(); assert.equal(requests.requests.length, 1); assert.equal(requests.requests[0].path, request.request.path);
     assert.equal((await call('/api/tracks/test-piece/state', { favorite: false }, { method: 'POST', headers: { origin: 'https://other.example', 'content-type': 'application/json' }, body: JSON.stringify({ favorite: false }) })).status, 403);
     assert.equal((await call('/api/tracks/test-piece/feedback', { text: '', time: 0 })).status, 400);
     saveMix(directory, score.id, { parts: { keys: { volume: 0.2, mute: true } } });
