@@ -127,7 +127,7 @@ function polyblep(t, dt) {
   return 0;
 }
 
-export const WAVES = { sine: 0, saw: 1, tri: 2, square: 3, noise: 4, pink: 5 };
+export const WAVES = { sine: 0, saw: 1, tri: 2, square: 3, noise: 4, pink: 5, string: 6 };
 
 // --- biquad (RBJ cookbook) ------------------------------------------------------------
 
@@ -354,6 +354,8 @@ export class Lane {
     this.send = spec.reverb || 0;
     this.filter = spec.filter ? makeFilter(spec.filter.type, spec.filter.freq, spec.filter.q ?? 0.707) : null;
     this.filterLfo = spec.filter && spec.filter.lfo ? spec.filter.lfo : null;
+    this.overdrive = spec.overdrive ?? null;
+    this.drivePrevious = 0;
     this.pumpTimes = spec.pump ? [] : null;
     this.pumpI = 0;
     this.pumpD = 0;
@@ -397,6 +399,18 @@ export class Lane {
       return;
     }
     const m = this.mono;
+    // Soft overdrive before the fader/pan; the existing low-pass acts as a
+    // cabinet. A midpoint sub-sample reduces high-frequency folding.
+    if (this.overdrive != null) {
+      const amount = 8 + this.overdrive * 48;
+      let previous = this.drivePrevious;
+      for (let k = 0; k < n; k++) {
+        const input = m[k];
+        m[k] = 0.14 * (Math.tanh(amount * (previous + input) / 2) + Math.tanh(amount * input)) / 2;
+        previous = input;
+      }
+      this.drivePrevious = previous;
+    }
     if (this.filter) {
       const f = this.filter;
       const freq = this.filterLfo ? f.freq + this.filterLfo.depth * Math.sin(TWO_PI * this.filterLfo.rate * tMid) : f.freq;
@@ -491,6 +505,22 @@ export class Synth {
       L.b1 = 0;
       L.b2 = 0;
       L.mul = L.detune ? Math.pow(2, L.detune / 1200) : 1;
+      if (L.wave === 6) {
+        const delay = Math.max(2, sr / L.freq - 0.5);
+        const length = Math.ceil(delay);
+        L.string = new Float32Array(length);
+        L.stringFraction = length - delay;
+        L.stringIndex = 0;
+        L.stringPrevious = 0;
+        let sum = 0, seed = L.rs;
+        for (let i = 0; i < length; i++) {
+          seed ^= seed << 13; seed ^= seed >>> 17; seed ^= seed << 5;
+          L.string[i] = (seed >>> 0) / 2147483648 - 1;
+          sum += L.string[i];
+        }
+        for (let i = 0; i < length; i++) L.string[i] -= sum / length;
+        L.stringLoss = Math.exp(-1 / (L.freq * (L.decay ?? 2)));
+      }
     }
     if (v.filter) {
       const f = v.filter;
@@ -631,6 +661,21 @@ export class Synth {
           L.b0 = b0;
           L.b1 = b1;
           L.b2 = b2;
+          break;
+        }
+        case 6: { // fractional-delay Karplus–Strong plucked string
+          const buffer = L.string, length = buffer.length;
+          let index = L.stringIndex, previous = L.stringPrevious;
+          const fraction = L.stringFraction, loss = L.stringLoss;
+          for (let k = 0; k < cnt; k++) {
+            const next = index + 1 === length ? 0 : index + 1;
+            const value = buffer[index] * (1 - fraction) + buffer[next] * fraction;
+            buffer[index] = (value + previous) * 0.5 * loss;
+            previous = value;
+            acc[k] += value * amp[k];
+            index = next;
+          }
+          L.stringIndex = index; L.stringPrevious = previous;
           break;
         }
         default:

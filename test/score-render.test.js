@@ -93,7 +93,7 @@ test('ten complete examples have unique music, form, speech boundaries and edita
 
 test('all presets produce finite audible samples and supported tone controls change sound', async () => {
   const catalog = getCatalog();
-  assert.equal(catalog.instruments.length, 19);
+  assert.equal(catalog.instruments.length, 28);
   for (const preset of catalog.instruments) {
     const score = fixture(); score.parts = [{ ...score.parts[0], instrument: preset.id, notes: [note(preset.drums ? 36 : 60, 0, 2)] }];
     if (preset.id === 'sample') score.parts[0].sample = { asset: 'builtin:made-of-light', effect: 'dry' };

@@ -8,7 +8,7 @@ import { encodeMidi } from './audio/midi.js';
 
 export const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 export const ID = /^[a-z0-9][a-z0-9-]{0,79}$/;
-export const VERSION = '0.1.0';
+export const VERSION = '0.2.0';
 export function requireId(id) { if (!ID.test(id ?? '')) throw new Error('Use a lowercase name with letters, digits and hyphens.'); return id; }
 export function writeJson(file, value) {
   fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -36,14 +36,15 @@ export function trackPath(directory, id, ...segments) {
 }
 
 async function scoreModule() { return import('./score.js'); }
-export async function initLibrary(directory, { examples = false, seed = 1, title = 'Your music', description = '' } = {}) {
+export async function initLibrary(directory, { examples = false, exampleSet = 'variety', seed = 1, title = 'Your music', description = '' } = {}) {
   const root = libraryPath(directory), file = path.join(root, 'collection.json');
   if (fs.existsSync(file)) return readJson(file);
   fs.mkdirSync(root, { recursive: true });
   let collection = { version: 1, id: 'your-music', title, description, source: 'personal', createdAt: new Date().toISOString(), tracks: [] };
   if (examples) {
-    const { buildExampleCollection } = await import('../examples/collection.js');
-    const built = buildExampleCollection({ seed });
+    if (!['variety', 'open-window'].includes(exampleSet)) throw new Error('Choose --collection variety or --collection open-window.');
+    const build = exampleSet === 'variety' ? (await import('../examples/variety.js')).buildVarietyCollection : (await import('../examples/collection.js')).buildExampleCollection;
+    const built = build({ seed });
     collection = { ...collection, ...built.collection, version: 1, source: 'examples', tracks: built.tracks.map(t => t.id) };
     for (const score of built.tracks) {
       requireId(score.id);
@@ -237,7 +238,7 @@ export async function midiForTrack(directory, id) {
   const expanded = compileScore(score);
   const { getCatalog } = await import('./catalog.js');
   const presets = new Map(getCatalog().instruments.map(p => [p.id, p]));
-  const percussion = { kick: 36, snare: 38, clap: 39, 'hi-hat': 42, shaker: 70 };
+  const percussion = { kick: 36, snare: 38, clap: 39, 'hi-hat': 42, shaker: 70, 'rock-kick': 36, 'rock-snare': 38, tom: 45, crash: 49, ride: 51, 'open-hat': 46 };
   const notesScore = expanded.parts ? expanded : expanded.score ?? score;
-  return encodeMidi({ title: score.title, bpm: score.bpm, sections: score.sections ?? [], tracks: (notesScore.parts ?? []).filter(p => !['sample', 'noise'].includes(p.instrument)).map(p => ({ name: p.name ?? p.id, program: presets.get(p.instrument)?.program ?? 80, drums: p.instrument in percussion, notes: (p.notes ?? []).map(n => ({ ...n, pitch: percussion[p.instrument] ?? n.pitch })) })) });
+  return encodeMidi({ title: score.title, bpm: score.bpm, sections: score.sections ?? [], tracks: (notesScore.parts ?? []).filter(p => !['sample', 'noise'].includes(p.instrument)).map(p => ({ name: p.name ?? p.id, program: presets.get(p.instrument)?.program ?? 80, drums: p.instrument in percussion, notes: (p.notes ?? []).map(n => ({ ...n, pitch: p.instrument === 'tom' ? n.pitch : percussion[p.instrument] ?? n.pitch })) })) });
 }

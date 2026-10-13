@@ -69,6 +69,13 @@ function schedule(synth, lane, note, part, beatSeconds, rng) {
       break;
     case 'hi-hat': instruments.hat(synth, lane, t, velocity, rng); break;
     case 'shaker': instruments.shaker(synth, lane, t, velocity, rng); break;
+    case 'guitar-clean': case 'guitar-crunch': case 'electric-bass': instruments.guitar(synth, lane, t, note.pitch, velocity, duration, rng, { ...tone, bass: part.instrument === 'electric-bass' }); break;
+    case 'rock-kick': instruments.rockKick(synth, lane, t, velocity, rng); break;
+    case 'rock-snare': instruments.rockSnare(synth, lane, t, velocity, rng); break;
+    case 'tom': instruments.tom(synth, lane, t, note.pitch, velocity, rng); break;
+    case 'crash': instruments.cymbal(synth, lane, t, velocity, rng); break;
+    case 'ride': instruments.cymbal(synth, lane, t, velocity, rng, { ride: true }); break;
+    case 'open-hat': instruments.hat(synth, lane, t, velocity, rng, { open: true, level: 0.09 }); break;
     default: sustained(synth, lane, t, note.pitch, velocity, duration, part.instrument, tone, rng);
   }
   // The primitives' acoustic partials assume 44.1 kHz; omit inaudible partials
@@ -134,8 +141,8 @@ export async function renderScore(score, { sampleRate = 44100, mix = {}, project
     const synth = new Synth(sampleRate, lastFrame);
     const tone = presets.get(part.instrument).controls;
     const cutoff = part.tone.brightness ?? tone.brightness?.default;
-    const filter = part.instrument === 'hi-hat' || part.instrument === 'shaker' ? { type: 'highpass', freq: 6500 } : part.instrument === 'clap' || part.instrument === 'snare' ? { type: 'bandpass', freq: 1800, q: 0.7 } : cutoff ? { type: 'lowpass', freq: cutoff } : null;
-    const lane = synth.lane({ gain: part.volume, pan: part.pan, filter });
+    const filter = ['hi-hat', 'shaker', 'open-hat'].includes(part.instrument) ? { type: 'highpass', freq: 6500 } : part.instrument === 'clap' || part.instrument === 'snare' ? { type: 'bandpass', freq: 1800, q: 0.7 } : cutoff ? { type: 'lowpass', freq: cutoff } : null;
+    const lane = synth.lane({ gain: part.volume, pan: part.pan, filter, overdrive: part.instrument === 'guitar-crunch' ? (part.tone.drive ?? 0.7) : null });
     const rng = makeRng(hashSeed(expandedScore.seed, part.id));
     let sample, events;
     if (part.instrument === 'sample') {
