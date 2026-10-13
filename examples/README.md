@@ -1,4 +1,10 @@
-# Original example collection
+# Original example collections
+
+`variety.js` exports `buildVarietyCollection({seed=21}={})`, returning collection metadata and ten editable scores for **Turn It Up**, the default examples on a fresh start. It opens with rock-and-roll, pop-punk and indie guitars, then explores dance-pop, disco/funk, Afro-pop, garage, two work grooves and electroclash. The seed changes performance detail and sleeves, not the composed motifs. Each piece has its own hook, contrasting sections and ending. Render the collection with `node bin/soundroo.js demo library/turn-it-up`.
+
+Both collections are labeled `source: "examples"`; neither generates personalized music or invokes a model or online service.
+
+## The Open Window
 
 `collection.js` exports `buildExampleCollection({seed=1,durationScale=1})`, returning collection metadata and ten editable version-1 scores. “The Open Window” is a built-in demonstration, explicitly labeled `source: "examples"`. These compositions are not personalized user music. Each has its own original motifs, instrumentation, harmonic movement, sections and ending. No model or online service is invoked.
 
