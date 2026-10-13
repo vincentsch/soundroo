@@ -1654,7 +1654,15 @@ function pixelRiot(seed) {
 /** Ten original built-in pieces, clearly labeled as examples rather than personalized music. */
 export function buildVarietyCollection({ seed = 21 } = {}) {
   if (!Number.isInteger(seed) || seed < 0 || seed > 0xffffffff) throw new TypeError('seed must be a uint32 integer.');
-  const tracks = [hotwireBoogie, rooftopRiot, northboundLights, neonConfetti, mirrorballShift, goldenHourAvenue, nightBusTwoStep, deepWorkCircuit, rainlineRunner, pixelRiot].map(build => build(seed));
+  const tracks = [hotwireBoogie, rooftopRiot, northboundLights, neonConfetti, mirrorballShift, goldenHourAvenue, nightBusTwoStep, deepWorkCircuit, rainlineRunner, pixelRiot].map(build => {
+    const score = build(seed);
+    // Leave room to turn a part up in the studio. Preserve relative balances,
+    // compensate the master, and trim for the compressor's reduced input level.
+    const scale = 1.25 / Math.max(...score.parts.map(p => p.volume));
+    for (const part of score.parts) part.volume *= scale;
+    score.master.volume = score.master.volume / scale * 0.9;
+    return score;
+  });
   return {
     collection: {
       version: 1, id: 'turn-it-up', title: 'Turn It Up', source: 'examples', tracks: tracks.map(t => t.id),

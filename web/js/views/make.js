@@ -5,6 +5,13 @@ import { data, loadDraft, saveDraft } from '../store.js';
 import { h, icon, toast, copyText, errorMessage } from '../dom.js';
 import { FEELS, LENGTHS, VOICES, buildPrompt, composeBrief, followUpPrompt, normalizeRequest, trackCount, formatDate, plural } from '../logic.js';
 
+const STARTERS = [
+  ['Rock and roll', 'Guitar-led rock and roll: boogie bass, crunchy riffs, strong backbeats, drum fills and hooks that arrive quickly. Give each piece a big chorus and its own identity.'],
+  ['Modern pop', 'Modern pop instrumentals with memorable lead hooks, moving bass, punchy drums and a clear verse-to-chorus lift. Vary dance-pop, indie guitar pop and soul/funk grooves.'],
+  ['Work grooves', 'Rhythmic music for working: UK garage, understated house, funk and liquid breakbeats. Keep a steady pulse and fewer foreground notes, with slow changes that hold interest.'],
+  ['Surprise me', 'A varied record with guitar-led rock, hook-driven pop, dance and funk, plus a few stylish work grooves. Distinct riffs and melodies, quick hooks and strong chorus contrasts.'],
+];
+
 export function makeView() {
   const saved = loadDraft();
   const draft = {
@@ -108,14 +115,14 @@ export function makeView() {
             h('p', { class: 'hint', id: 'brief-hint' }, 'Give it a place, a feeling, or a sound. A few words are enough.')),
           h('div', { class: 'field' },
             h('p', { class: 'hint' }, 'Start with a sound'),
-            h('div', { class: 'chips' }, [
-              ['Rock and roll', 'Guitar-led rock and roll: boogie bass, crunchy riffs, strong backbeats, drum fills and hooks that arrive quickly. Give each piece a big chorus and its own identity.'],
-              ['Modern pop', 'Modern pop instrumentals with memorable lead hooks, moving bass, punchy drums and a clear verse-to-chorus lift. Vary dance-pop, indie guitar pop and soul/funk grooves.'],
-              ['Work grooves', 'Rhythmic music for working: UK garage, understated house, funk and liquid breakbeats. Keep a steady pulse and fewer foreground notes, with slow changes that hold interest.'],
-              ['Surprise me', 'A varied record with guitar-led rock, hook-driven pop, dance and funk, plus a few stylish work grooves. Distinct riffs and melodies, quick hooks and strong chorus contrasts.'],
-            ].map(([label, brief]) => h('button', { type: 'button', class: 'chip', onclick: () => {
-              draft.brief = brief; briefInput.value = brief;
-              draft.feel = []; chips.forEach(chip => chip.setAttribute('aria-pressed', 'false'));
+            h('div', { class: 'chips' }, STARTERS.map(([label, brief]) => h('button', { type: 'button', class: 'chip', onclick: () => {
+              const current = draft.brief.trim();
+              const replace = !current || STARTERS.some(([, text]) => text === current);
+              const next = replace ? brief : current.includes(brief) ? draft.brief : `${draft.brief.trimEnd()}\n\n${brief}`;
+              if (next.length > 4000) { toast('Your brief is full. Shorten it to add a direction.'); return; }
+              draft.brief = next;
+              briefInput.value = draft.brief;
+              if (replace) { draft.feel = []; chips.forEach(chip => chip.setAttribute('aria-pressed', 'false')); }
               changed();
             } }, label)))),
           h('fieldset', { class: 'field' },

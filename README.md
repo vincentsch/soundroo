@@ -44,7 +44,13 @@ The softer **The Open Window** collection is also available:
 node bin/soundroo.js start library/open-window --collection open-window
 ```
 
-Existing libraries keep their music. Use a new library folder to try another example collection.
+Existing libraries keep their music. To hear the new set from an existing checkout:
+
+```bash
+node bin/soundroo.js start library/turn-it-up
+```
+
+Use a new library folder to try another example collection.
 
 The usual studio address is `http://127.0.0.1:4317`, so browser preferences and your listening position survive restarts. If that port is occupied, Soundroo prints another local address. Use `--port NUMBER` to choose one.
 

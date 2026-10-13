@@ -178,7 +178,7 @@ export async function renderScore(score, { sampleRate = 44100, mix = {}, project
         }
         bus.active = bus.active.filter(e => e.start + e.length > offset + count);
       }
-      const wet = presets.get(bus.part.instrument).drums ? 0.12 : bus.part.instrument === 'bass' || bus.part.instrument === 'acid-bass' ? 0.08 : 0.5;
+      const wet = presets.get(bus.part.instrument).drums ? 0.12 : ['bass', 'acid-bass', 'electric-bass'].includes(bus.part.instrument) ? 0.08 : 0.5;
       for (let i = 0; i < count; i++) {
         left[i] += bus.left[i]; right[i] += bus.right[i];
         send[i] += (bus.left[i] + bus.right[i]) * 0.5 * wet;

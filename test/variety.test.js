@@ -16,6 +16,8 @@ test('the broader default contains ten different songs, early guitar riffs and v
     assert.ok(t.beats * 60 / t.bpm >= 100 && t.beats * 60 / t.bpm <= 165, t.id);
     if (expanded.parts.some(p => p.instrument.startsWith('guitar-') && p.notes.some(n => n.beat < 8))) earlyGuitars++;
     assert.ok(t.sections.length >= 5, t.id);
+    assert.ok(t.parts.every(p => p.volume <= 1.25), 'leave room on each mixer fader');
+    assert.ok(t.master.volume <= 2, 'master compensation must fit the mixer');
   }
   assert.ok(earlyGuitars >= 3);
   assert.deepEqual(buildVarietyCollection({ seed: 21 }), buildVarietyCollection({ seed: 21 }));

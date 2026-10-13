@@ -239,6 +239,8 @@ export async function midiForTrack(directory, id) {
   const { getCatalog } = await import('./catalog.js');
   const presets = new Map(getCatalog().instruments.map(p => [p.id, p]));
   const percussion = { kick: 36, snare: 38, clap: 39, 'hi-hat': 42, shaker: 70, 'rock-kick': 36, 'rock-snare': 38, tom: 45, crash: 49, ride: 51, 'open-hat': 46 };
+  // GM toms occupy a sparse range; other pitches would select cymbals or effects.
+  const tomPitch = pitch => [41, 43, 45, 47, 48, 50].reduce((a, b) => Math.abs(b - pitch) < Math.abs(a - pitch) ? b : a);
   const notesScore = expanded.parts ? expanded : expanded.score ?? score;
-  return encodeMidi({ title: score.title, bpm: score.bpm, sections: score.sections ?? [], tracks: (notesScore.parts ?? []).filter(p => !['sample', 'noise'].includes(p.instrument)).map(p => ({ name: p.name ?? p.id, program: presets.get(p.instrument)?.program ?? 80, drums: p.instrument in percussion, notes: (p.notes ?? []).map(n => ({ ...n, pitch: p.instrument === 'tom' ? n.pitch : percussion[p.instrument] ?? n.pitch })) })) });
+  return encodeMidi({ title: score.title, bpm: score.bpm, sections: score.sections ?? [], tracks: (notesScore.parts ?? []).filter(p => !['sample', 'noise'].includes(p.instrument)).map(p => ({ name: p.name ?? p.id, program: presets.get(p.instrument)?.program ?? 80, drums: p.instrument in percussion, notes: (p.notes ?? []).map(n => ({ ...n, pitch: p.instrument === 'tom' ? tomPitch(n.pitch) : percussion[p.instrument] ?? n.pitch })) })) });
 }

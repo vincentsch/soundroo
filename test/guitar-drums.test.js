@@ -46,10 +46,11 @@ test('MIDI preserves new guitar program and different pitches in a tom fill', as
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'soundroo-rock-midi-'));
   try {
     const s = score('guitar-crunch');
-    s.parts.push({ id: 'fill', instrument: 'tom', notes: [41, 45, 50].map((pitch, i) => ({ pitch, beat: i, duration: 0.2, velocity: 0.7 })) });
+    s.parts.push({ id: 'fill', instrument: 'tom', notes: [41, 45, 50, 52, 55, 57].map((pitch, i) => ({ pitch, beat: i, duration: 0.2, velocity: 0.7 })) });
     await addTrack(dir, s);
     const midi = await midiForTrack(dir, s.id);
     assert.ok(midi.includes(Buffer.from([0xc0, 29])));
     for (const pitch of [41, 45, 50]) assert.ok(midi.includes(Buffer.from([0x99, pitch])), `tom ${pitch}`);
+    for (const pitch of [52, 55, 57]) assert.ok(!midi.includes(Buffer.from([0x99, pitch])), `tom must not select cymbal ${pitch}`);
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
