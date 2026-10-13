@@ -20,6 +20,8 @@ Try an idea like a rainy city after midnight, a sunlit electronic record, quiet 
 
 ## Listen first
 
+![Soundroo's local listening studio showing Signal Garden](docs/studio.jpg)
+
 The studio gives your music a home: original record sleeves, a collection view, track lists, favorites, a queue and a persistent player. Open a track to see its sections, leave notes at particular moments or compare rendered versions. A full-screen listening view responds to the playing audio. Search, shuffle, repeat, keyboard controls and light/dark themes are built in.
 
 When you want to go deeper, open the mixer. Change instrument levels, pan, mute and solo, then save the mix as a new rendered version. Or simply tell your agent, “Keep the melody, make the drums softer, and give the middle section more room.” Your feedback and musical requests stay in the local library.
@@ -38,7 +40,7 @@ Open the local URL printed in the terminal. The first start prepares **The Open 
 
 The usual studio address is `http://127.0.0.1:4317`, so browser preferences and your listening position survive restarts. If that port is occupied, Soundroo prints another local address. Use `--port NUMBER` to choose one.
 
-The repository remains private during development and review, so cloning currently requires access.
+The repository is private, so cloning currently requires access.
 
 ## Words can become instruments
 
