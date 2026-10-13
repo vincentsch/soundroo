@@ -1,0 +1,44 @@
+[
+  {
+    "id": "made-of-light",
+    "text": "We are made of light.",
+    "voice": "af_heart",
+    "sampleRate": 24000,
+    "duration": 1.12
+  },
+  {
+    "id": "stay-a-little",
+    "text": "Stay a little longer.",
+    "voice": "af_bella",
+    "sampleRate": 24000,
+    "duration": 1.01
+  },
+  {
+    "id": "in-the-rhythm",
+    "text": "Lost in the rhythm.",
+    "voice": "am_michael",
+    "sampleRate": 24000,
+    "duration": 1.17
+  },
+  {
+    "id": "city-never-sleeps",
+    "text": "A city that never sleeps.",
+    "voice": "af_nicole",
+    "sampleRate": 24000,
+    "duration": 1.875
+  },
+  {
+    "id": "let-it-change",
+    "text": "Let it change.",
+    "voice": "af_heart",
+    "sampleRate": 24000,
+    "duration": 0.905
+  },
+  {
+    "id": "slow-down",
+    "text": "Slow down. Breathe. Begin again.",
+    "voice": "am_michael",
+    "sampleRate": 24000,
+    "duration": 2.265
+  }
+]
