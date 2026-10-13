@@ -74,6 +74,17 @@ Download a rendered WAV, editable score, MIDI, instrument stems or a portable li
 
 MIDI keeps notes and timing with instrument mappings, rather than the exact synthesized sounds or spoken samples. Stems contain instrument buses before shared master processing and may not sum exactly to the mastered mix.
 
+## Share it, if you like
+
+Sharing is optional and nothing leaves your computer until you ask. When you want links to send around, tell your agent to publish the collection, or press **Share on Soundroo** in the studio:
+
+```bash
+node bin/soundroo.js share --library library/my-music --dry-run
+node bin/soundroo.js share --library library/my-music --rights-accepted
+```
+
+soundroo.com renders the audio from your scores with an official Soundroo engine, so only scores, mix settings and the collection title are sent. The first share needs no account: it creates a guest artist page and returns a private claim link that moves the music to your own account later. Open tracks can be imported, remixed and shared again with credit. [Sharing](docs/sharing.md) explains what is sent, the choices and the commands.
+
 ## Compose and extend
 
 Soundroo uses ordinary JSON scores and small JavaScript composition helpers. Named patterns and clips let an agent develop a motif without rewriting each note, and score version 2 writes drum steps and melodic lines as short strings. Its 28 local instrument types include clean/crunch guitar, picked electric bass, rock drums and cymbals, electric piano, analog/FM leads, mallets, pads and processed speech. [The composing guide](docs/composing.md) includes a runnable example and the score format. [Musical directions](docs/musical-directions.md) covers riffs, hooks and grooves. [AGENTS.md](AGENTS.md) gives the complete agent workflow. [The headless engine](docs/headless.md) validates, renders and identifies scores for servers and other tools.

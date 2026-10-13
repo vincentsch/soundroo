@@ -8,6 +8,7 @@ import { syncTransport } from './transport.js';
 import { openNowPlaying, closeNowPlaying, isOpen as nowPlayingOpen } from './nowplaying.js';
 import { toggleQueue } from './queue.js';
 import { openSettings, openShortcuts, openNoteDialog } from './dialogs.js';
+import { initShare } from './share.js';
 import { closeMenu } from './menu.js';
 import { homeView } from './views/home.js';
 import { tracksView, setQuery } from './views/tracks.js';
@@ -308,3 +309,4 @@ async function boot() {
 applyAppearance();
 syncTransport();
 boot();
+initShare();

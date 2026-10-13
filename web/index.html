@@ -42,6 +42,7 @@
         <button type="button" class="icon-btn" id="open-settings" aria-label="Settings" title="Settings"><svg class="icon" aria-hidden="true"><use href="#i-settings"/></svg></button>
         <button type="button" class="icon-btn" id="open-shortcuts" aria-label="Keyboard shortcuts" title="Keyboard shortcuts (?)"><svg class="icon" aria-hidden="true"><use href="#i-keyboard"/></svg></button>
       </div>
+      <button type="button" class="btn btn-tinted sidebar-share" data-open="share" hidden><svg class="icon" aria-hidden="true"><use href="#i-globe"/></svg>Share on Soundroo</button>
       <a class="btn btn-primary sidebar-cta" href="#/make" data-nav="make"><svg class="icon" aria-hidden="true"><use href="#i-sparkle"/></svg>Make music</a>
     </div>
   </aside>
@@ -51,7 +52,10 @@
       <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><use href="#logo"/></svg>
       <span class="brand-name">Soundroo</span>
     </a>
-    <button type="button" class="icon-btn" data-open="settings" aria-label="Settings" title="Settings"><svg class="icon" aria-hidden="true"><use href="#i-settings"/></svg></button>
+    <div class="topbar-tools">
+      <button type="button" class="icon-btn" data-open="share" aria-label="Share on Soundroo" title="Share on Soundroo" hidden><svg class="icon" aria-hidden="true"><use href="#i-globe"/></svg></button>
+      <button type="button" class="icon-btn" data-open="settings" aria-label="Settings" title="Settings"><svg class="icon" aria-hidden="true"><use href="#i-settings"/></svg></button>
+    </div>
   </header>
 
   <main id="main" class="main" tabindex="-1"></main>
@@ -233,6 +237,10 @@
         <div><dt><kbd>Esc</kbd></dt><dd>Close a panel or the full-screen player</dd></div>
       </dl>
     </div>
+  </dialog>
+
+  <dialog class="sheet share-sheet" id="share-dialog" aria-labelledby="share-title">
+    <div class="sheet-body" id="share-body"></div>
   </dialog>
 
   <div class="menu" id="menu" popover role="menu" aria-label="Options"></div>

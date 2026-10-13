@@ -8,9 +8,12 @@ import { createSpeech, transformSpeech } from '../src/voice.js';
 const args = process.argv.slice(2);
 const command = args.shift() ?? 'start';
 const options = {}, positional = [];
-const boolean = new Set(['json', 'examples', 'all', 'replace', 'stems', 'help', 'version', 'no-render']);
+const boolean = new Set(['json', 'examples', 'all', 'replace', 'stems', 'help', 'version', 'no-render', 'dry-run', 'rights-accepted', 'no-wait', 'force', 'confirm', 'start', 'wait', 'local-only', 'refresh', 'no-guest']);
+// Optional network sharing; its code loads only for these commands.
+const network = new Set(['share', 'publish', 'login', 'logout', 'whoami', 'claim-link', 'import', 'cloud']);
 try {
-for (let i = 0; i < args.length; i++) {
+// cloud passes its arguments to soundroo-cloud unchanged.
+for (let i = 0; command !== 'cloud' && i < args.length; i++) {
   const arg = args[i];
   if (arg.startsWith('--')) {
     const [key, inline] = arg.slice(2).split('=', 2);
@@ -28,7 +31,7 @@ const directory = libraryPath(options.library ?? (['init', 'start', 'demo', 'lis
 const number = (key, fallback) => options[key] == null ? fallback : Number(options[key]);
 const exampleSeed = () => number('seed', (options.collection ?? 'variety') === 'variety' ? 21 : 1);
 function help() {
-  print(`Soundroo ${VERSION} — music made with your coding agent\n\nUse Node 22 or newer. No installation is needed for instrumental music.\n\n  node bin/soundroo.js start [library]       Open the local listening studio; first start loads ten examples\n  node bin/soundroo.js init [library]        Create an empty personal collection\n  node bin/soundroo.js demo [library]        Create and render the original example collection\n  node bin/soundroo.js add score.json        Add an editable composition (--replace revises it)\n  node bin/soundroo.js validate score.json   Check a composition before rendering\n  node bin/soundroo.js render [track-id]     Render a track, or --all; --stems exports its parts\n  node bin/soundroo.js inspect [track-id]    Inspect saved music and audio reports\n  node bin/soundroo.js list [library]        List the collection\n  node bin/soundroo.js catalog               Discover instruments and tone controls\n  node bin/soundroo.js requests              Read pending musical briefs from the studio\n  node bin/soundroo.js doctor                Check the local runtime\n  node bin/soundroo.js version               Show the toolkit version and engine hash\n  node bin/soundroo.js voice create "words" --out library/assets/voice.wav\n  node bin/soundroo.js voice process voice.wav --effect vocoder --out processed.wav\n\nOptions: --library PATH, --json, --port NUMBER, --seed NUMBER, --title TEXT, --collection variety|open-window.\nSpeech creation is optional and needs Kokoro; speech effects and bundled voice examples work with Node alone.\nThe studio creates no hidden model calls. Your existing coding agent composes and revises the music.`);
+  print(`Soundroo ${VERSION} — music made with your coding agent\n\nUse Node 22 or newer. No installation is needed for instrumental music.\n\n  node bin/soundroo.js start [library]       Open the local listening studio; first start loads ten examples\n  node bin/soundroo.js init [library]        Create an empty personal collection\n  node bin/soundroo.js demo [library]        Create and render the original example collection\n  node bin/soundroo.js add score.json        Add an editable composition (--replace revises it)\n  node bin/soundroo.js validate score.json   Check a composition before rendering\n  node bin/soundroo.js render [track-id]     Render a track, or --all; --stems exports its parts\n  node bin/soundroo.js inspect [track-id]    Inspect saved music and audio reports\n  node bin/soundroo.js list [library]        List the collection\n  node bin/soundroo.js catalog               Discover instruments and tone controls\n  node bin/soundroo.js requests              Read pending musical briefs from the studio\n  node bin/soundroo.js doctor                Check the local runtime\n  node bin/soundroo.js version               Show the toolkit version and engine hash\n  node bin/soundroo.js voice create "words" --out library/assets/voice.wav\n  node bin/soundroo.js voice process voice.wav --effect vocoder --out processed.wav\n\nOptional sharing on soundroo.com (only these commands use the network; see docs/sharing.md):\n  node bin/soundroo.js share --dry-run       Preview what would be uploaded; nothing is sent or saved\n  node bin/soundroo.js share --rights-accepted   Publish the library and print its links\n  node bin/soundroo.js share status          Show this library's shared links\n  node bin/soundroo.js import LINK           Add an open track to the library as a remix\n  node bin/soundroo.js login | logout | whoami | claim-link\n\nOptions: --library PATH, --json, --port NUMBER, --seed NUMBER, --title TEXT, --collection variety|open-window, --service URL.\nSpeech creation is optional and needs Kokoro; speech effects and bundled voice examples work with Node alone.\nThe studio creates no hidden model calls. Your existing coding agent composes and revises the music.`);
 }
 
 try {
@@ -51,11 +54,11 @@ try {
     } else {
       const port = number('port', 4317); if (!Number.isInteger(port) || port < 0 || port > 65535) throw new Error('Port must be an integer between 0 and 65535.');
       let studio;
-      try { studio = await startServer(directory, { port, renderMissing: !options['no-render'], log }); }
+      try { studio = await startServer(directory, { port, renderMissing: !options['no-render'], log, service: options.service }); }
       catch (error) {
         if (error.code !== 'EADDRINUSE' || options.port != null) throw error;
         log('The usual studio port is busy; opening another local address.');
-        studio = await startServer(directory, { port: 0, renderMissing: !options['no-render'], log });
+        studio = await startServer(directory, { port: 0, renderMissing: !options['no-render'], log, service: options.service });
       }
       print(options.json ? { url: studio.url, directory, tracks: getLibrary(directory).tracks.length } : `Soundroo is listening at ${studio.url}\nMusic library: ${directory}\nOpen the link in your browser. Press Ctrl+C to close the studio.`);
       const close = async () => { await studio.close(); process.exit(0); };
@@ -84,6 +87,9 @@ try {
     if (action === 'create') print(await createSpeech(source, path.resolve(options.out), { voice: options.voice ?? 'af_heart', dtype: options.dtype ?? 'q8', cacheDir: options.cache, log }));
     else if (action === 'process') print(transformSpeech(source, path.resolve(options.out), { effect: options.effect ?? 'dry', semitones: number('semitones', 0), pitch: number('pitch', 57), stretch: number('stretch', 1), bpm: number('bpm', 120) }));
     else throw new Error('Use voice create or voice process.');
+  } else if (network.has(command)) {
+    const { runNetworkCommand } = await import('../src/cloud/cli.js');
+    process.exitCode = await runNetworkCommand(command, { positional, options, raw: args, print, log });
   } else throw new Error(`Unknown command: ${command}. Run --help for the available commands.`);
 } catch (error) {
   if (options.json) print({ error: error.message }); else log('Soundroo: ' + error.message);

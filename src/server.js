@@ -87,9 +87,36 @@ function sharePage(score, duration) {
   return `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escape(score.title)} — Soundroo</title><style>body{margin:0;background:#141416;color:#eee;font:16px system-ui;display:grid;place-items:center;min-height:100vh}main{width:min(90vw,520px);padding:36px 0}img{width:100%;border-radius:10px}h1{font-size:32px;margin-bottom:8px}p{color:#aaa;line-height:1.6}audio{width:100%;margin:22px 0}a{color:#d9b97b}.label{letter-spacing:3px;font-size:11px}</style><main><p class="label">SOUNDROO</p><img src="cover.svg" alt="${escape(score.title)} cover"><h1>${escape(score.title)}</h1><p>${escape(score.description ?? '')}</p><p>${escape(score.genre ?? '')} · ${escape(score.bpm)} BPM · ${Math.floor(duration / 60)}:${String(Math.floor(duration % 60)).padStart(2, '0')}</p><audio controls preload="metadata" src="track.wav"></audio><p>Open this page with the files beside it. The editable composition is in score.json.</p><a href="https://github.com/vincentsch/soundroo">Soundroo</a></main></html>`;
 }
 
-export async function startServer(directory, { port = 0, renderMissing = true, log = () => {} } = {}) {
+// Optional sharing. The module loads on the first /api/share request and
+// contacts the service only when the listener presses Share or Sign in.
+const SHARE_STATUS = { 1: 400, 2: 502, 3: 401, 4: 403, 5: 404, 6: 429 };
+async function shareRoute(share, request, response, action, host) {
+  if (action === '' && request.method === 'GET') { json(response, await share.status()); return; }
+  // Everything else comes only from this studio's page: its per-start token,
+  // a same-origin fetch and, for changes, this studio's own Origin.
+  const site = request.headers['sec-fetch-site'];
+  const mutation = request.method !== 'GET';
+  if (request.headers['x-soundroo-share'] !== share.token || (site && site !== 'same-origin') || (mutation && request.headers.origin !== `http://${host}`)) {
+    json(response, { error: 'Sharing accepts requests from this studio page only. Reload the page and try again.', code: 'forbidden' }, 403); return;
+  }
+  try {
+    const job = /^\/jobs\/([a-f0-9]{16})$/.exec(action);
+    if (action === '/account' && request.method === 'GET') json(response, await share.account());
+    else if (action === '/preview' && request.method === 'POST') json(response, await share.preview(await jsonBody(request)));
+    else if (action === '/publish' && request.method === 'POST') json(response, { job: share.publish(await jsonBody(request)) }, 202);
+    else if (job && request.method === 'GET') json(response, { job: share.job(job[1]) });
+    else if (action === '/login' && request.method === 'POST') json(response, await share.startLogin());
+    else if (action === '/login' && request.method === 'GET') json(response, share.loginStatus());
+    else json(response, { error: 'This sharing operation does not exist.' }, 404);
+  } catch (error) {
+    json(response, { error: error.message, code: error.code ?? 'error', ...(error.issues ? { issues: error.issues } : {}), ...(error.hint ? { hint: error.hint } : {}) }, error.status ?? SHARE_STATUS[error.exitCode] ?? 400);
+  }
+}
+
+export async function startServer(directory, { port = 0, renderMissing = true, log = () => {}, service } = {}) {
   directory = libraryPath(directory);
   const queue = createRenderQueue(directory);
+  let share = null;
   const artwork = score => coverSvg(score, { index: readJson(path.join(directory, 'collection.json')).tracks.indexOf(score.id) });
   let url;
   async function ensureAudio(id, { stems = false } = {}) {
@@ -154,6 +181,10 @@ export async function startServer(directory, { port = 0, renderMissing = true, l
         }
         json(response, { error: 'This track operation does not exist.' }, 404); return;
       }
+      if (pathname === '/api/share' || pathname.startsWith('/api/share/')) {
+        share ??= (await import('./cloud/studio.js')).createShareService(directory, { service });
+        await shareRoute(share, request, response, pathname.slice('/api/share'.length), host); return;
+      }
       if (pathname.startsWith('/api/')) { json(response, { error: 'This studio operation does not exist.' }, 404); return; }
       if (!['GET', 'HEAD'].includes(request.method)) { json(response, { error: 'Method not supported.' }, 405); return; }
       const rel = pathname === '/' ? 'index.html' : pathname.slice(1);
@@ -175,5 +206,5 @@ export async function startServer(directory, { port = 0, renderMissing = true, l
       if (!track.rendered || readCurrent(directory, track.id)?.id !== sourceIdentity(directory, readScore(directory, track.id), readMix(directory, track.id))) queue.enqueue(track.id);
     } catch (error) { log(`${track.id}: ${error.message}`); }
   }
-  return { server, queue, url, directory, close: async () => { await queue.close(); server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); } };
+  return { server, queue, url, directory, close: async () => { share?.close(); await queue.close(); server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); } };
 }

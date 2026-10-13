@@ -29,6 +29,16 @@ The studio saves notes in `tracks/<id>/feedback.json` and musical requests in `r
 
 Mix changes in the studio render a new version. If you edit notes, preserve `mix.json` unless the user asks for a new mix. The user's player volume is a listening preference; it does not change exports. WAV downloads contain the rendered mix. MIDI contains note data and instrument mappings; sampled speech/noise and the synthesized timbre are not preserved in MIDI. Stems omit shared master processing and need not sum to the mastered WAV.
 
+## Sharing, only when asked
+
+Sharing on soundroo.com is optional and never part of making a collection. Publish only when the user explicitly asks you to share or publish. Read `docs/sharing.md` first.
+
+1. Render every track to share, then preview with `node bin/soundroo.js share --library PATH --dry-run --json`. Tell the user what will be sent and its choices (`--visibility`, `--access`).
+2. Ask the user to confirm they have the right to share this music. Pass `--rights-accepted` only after they confirm; never assume it.
+3. Run `node bin/soundroo.js share --library PATH --rights-accepted --json` and return the collection and track links. Give the claim link to the user privately and say that whoever opens it can claim the artist page.
+
+Never share the built-in example collections or examples as the user's music, and never present tracks as verified human or AI work: the service only checks that scores render with an official engine. Local `assets/` WAVs cannot be shared; convert them to speech recipes or leave the part out. Keys stay in soundroo-cloud's own configuration; never print, request or store them. Login prints a link for the user to open; never open a browser for them. Do not delete or edit shared music unless the user asks for that specific change.
+
 ## Headless and compact composition
 
 `src/headless.js` exposes the same validation, rendering, MIDI and sleeve functions as the CLI. See `docs/headless.md`. Its engine hash identifies rendering/validation/identity source, independently of network/UI code. Version 2 scores accept compact `steps` and `line` strings in patterns; they compile to ordinary notes. `examples/paper-satellites.json` demonstrates a complete compact piece. Existing version 1 scores remain supported.
