@@ -236,6 +236,20 @@ export function buildExampleCollection({ seed = 1, durationScale = 1 } = {}) {
   if (!Number.isInteger(seed) || seed < 0 || seed > 0xffffffff) throw new TypeError('seed must be a uint32 integer.');
   if (!Number.isFinite(durationScale) || durationScale <= 0 || durationScale > 4) throw new TypeError('durationScale must be greater than 0 and at most 4.');
   const tracks = [house, downtempo, ambient, synthwave, piano, broken, dub, kosmische, chamber, speech].map(build => build(seed, durationScale));
+  // Every record in the collection has its own original sleeve composition.
+  const sleeves = ['sun', 'strata', 'ripple', 'window', 'monolith', 'constellation', 'wave', 'orbit', 'petal', 'weave'];
+  const palettes = [
+    ['#35302b', '#ddbb86', '#f1ede1'], ['#1f1b4d', '#f67553', '#f5cf89'],
+    ['#082b28', '#84d5af', '#d7f29a'], ['#eddccb', '#dc5436', '#272321'],
+    ['#412116', '#ea9378', '#eec89c'], ['#f0d832', '#253734', '#fff5c5'],
+    ['#152d69', '#97cbff', '#f6e6b3'], ['#102e35', '#b6e0c5', '#f1f0d7'],
+    ['#2e1d36', '#e57bae', '#ffd5b6'], ['#161826', '#98a6ee', '#e7e0fe'],
+  ];
+  const levels = [0.95, 1.15, 2, 1.45, 1.8, 0.9, 1, 1.25, 2, 1.15];
+  tracks.forEach((track, i) => {
+    track.artwork = { style: sleeves[i], colors: palettes[i], seed };
+    track.master.volume = levels[i];
+  });
   // Very short previews retain the form, but truncate the final gestures to the
   // smaller timeline. Full-size compositions keep their original note lengths.
   for (const track of tracks) for (const p of track.parts) {

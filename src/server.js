@@ -143,7 +143,7 @@ export async function startServer(directory, { port = 0, renderMissing = true, l
               const stemDir = trackPath(directory, id, 'stems', current.id);
               entries.push({ name: 'master.wav', path: trackPath(directory, id, 'renders', current.id + '.wav') });
               for (const file of fs.readdirSync(stemDir).filter(n => n.endsWith('.wav'))) entries.push({ name: 'stems/' + file, path: path.join(stemDir, file) });
-              entries.push({ name: 'README.txt', bytes: 'Instrument stems preserve part effects. Their sum can differ from the master because of master mix processing. MIDI preserves note data, not the instrument sound.\n' });
+              entries.push({ name: 'README.txt', bytes: 'Dry instrument stems include part volume, pan, mute and solo. Shared master reverb, compression and gain are in the master WAV only. MIDI preserves note data, not the instrument sound.\n' });
             } else {
               entries.push({ name: 'index.html', bytes: sharePage(score, current.duration) }, { name: 'cover.svg', bytes: coverSvg(score) }, { name: 'track.wav', path: trackPath(directory, id, 'renders', current.id + '.wav') });
             }

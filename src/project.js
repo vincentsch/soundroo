@@ -184,7 +184,7 @@ export function trackInfo(directory, id, { detail = false } = {}) {
     sections: (score.sections ?? []).map(s => ({ id: s.id, name: s.name, start: s.beat * seconds, end: (s.beat + s.beats) * seconds })),
     parts: (score.parts ?? []).map((p, i) => ({ id: p.id, name: p.name ?? p.id, instrument: p.instrument, volume: mix.parts?.[p.id]?.volume ?? p.volume ?? 0.7, pan: mix.parts?.[p.id]?.pan ?? p.pan ?? 0, mute: mix.parts?.[p.id]?.mute ?? false, solo: mix.parts?.[p.id]?.solo ?? false, color: p.color ?? ['#ef946b', '#a9bce8', '#b9d0ac', '#b69ccf', '#e2ce87'][i % 5] })),
   };
-  if (detail) Object.assign(info, { score, mix, report, feedback: readJson(trackPath(directory, id, 'feedback.json'), []) });
+  if (detail) Object.assign(info, { score, mix: { ...mix, master: { volume: score.master?.volume ?? 1, ...mix.master } }, report, feedback: readJson(trackPath(directory, id, 'feedback.json'), []) });
   return info;
 }
 export function getLibrary(directory, jobs = []) {
@@ -202,8 +202,9 @@ export async function renderTrack(directory, id, { sampleRate = 44100, stems = f
   const wavFile = trackPath(directory, id, 'renders', revision + '.wav');
   const reportFile = trackPath(directory, id, 'renders', revision + '.report.json');
   const stemsDir = trackPath(directory, id, 'stems', revision);
+  const cached = fs.existsSync(wavFile) && fs.existsSync(reportFile) && (!stems || fs.existsSync(stemsDir));
   let report;
-  if (!fs.existsSync(wavFile) || !fs.existsSync(reportFile) || (stems && !fs.existsSync(stemsDir))) {
+  if (!cached) {
     const { renderScore } = await import('./render.js');
     const result = await renderScore(score, { sampleRate, mix, projectDir: libraryPath(directory), stems, progress, resolveSample: asset => resolveSample(directory, asset) });
     const audio = result.audio;
@@ -218,7 +219,7 @@ export async function renderTrack(directory, id, { sampleRate = 44100, stems = f
       for (const [partId, buffer] of Object.entries(result.stems)) {
         requireId(partId); fs.writeFileSync(path.join(stemsDir, partId + '.wav'), Buffer.from(encodeWav(buffer)), { mode: 0o600 });
       }
-      writeJson(path.join(stemsDir, 'notes.json'), { note: 'Instrument stems preserve part effects. Master mix processing can prevent their sum from exactly reproducing the master.', revision });
+      writeJson(path.join(stemsDir, 'notes.json'), { note: 'Dry instrument stems include part volume, pan, mute and solo. Shared master reverb, compression and gain are in the master WAV only.', revision });
     }
   } else report = readJson(reportFile);
   const versions = readVersions(directory, id);
@@ -227,7 +228,7 @@ export async function renderTrack(directory, id, { sampleRate = 44100, stems = f
   // A mix changed during rendering must not replace the newer requested state.
   if (sourceIdentity(directory, readScore(directory, id), readMix(directory, id), sampleRate) === revision) writeJson(path.join(dir, 'current.json'), entry);
   progress?.(1);
-  return { id, revision, duration: report.duration, file: wavFile, report, cached: Boolean(fs.existsSync(wavFile)), stemsDir: stems ? stemsDir : null };
+  return { id, revision, duration: report.duration, file: wavFile, report, cached, stemsDir: stems ? stemsDir : null };
 }
 
 export async function midiForTrack(directory, id) {

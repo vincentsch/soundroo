@@ -9,6 +9,7 @@ const args = process.argv.slice(2);
 const command = args.shift() ?? 'start';
 const options = {}, positional = [];
 const boolean = new Set(['json', 'examples', 'all', 'replace', 'stems', 'help', 'version', 'no-render']);
+try {
 for (let i = 0; i < args.length; i++) {
   const arg = args[i];
   if (arg.startsWith('--')) {
@@ -16,6 +17,10 @@ for (let i = 0; i < args.length; i++) {
     if (boolean.has(key)) options[key] = inline == null ? true : inline === 'true';
     else { const value = inline ?? args[++i]; if (value == null || value.startsWith('--')) throw new Error(`--${key} needs a value.`); options[key] = value; }
   } else positional.push(arg);
+}
+} catch (error) {
+  process.stderr.write('Soundroo: ' + error.message + '\n');
+  process.exit(1);
 }
 const log = message => process.stderr.write(message + '\n');
 const print = value => process.stdout.write(typeof value === 'string' ? value + '\n' : JSON.stringify(value, null, 2) + '\n');
