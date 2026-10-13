@@ -2,13 +2,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { encodeWav } from './audio/wav.js';
-import { analyzeAudio, technicalWarnings } from './audio/analysis.js';
-import { encodeMidi } from './audio/midi.js';
+import * as engine from './headless.js';
 
+export { VERSION } from './version.js';
 export const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 export const ID = /^[a-z0-9][a-z0-9-]{0,79}$/;
-export const VERSION = '0.2.0';
 export function requireId(id) { if (!ID.test(id ?? '')) throw new Error('Use a lowercase name with letters, digits and hyphens.'); return id; }
 export function writeJson(file, value) {
   fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -64,17 +62,6 @@ export function readMix(directory, id) { return readJson(trackPath(directory, id
 export function readCurrent(directory, id) { return readJson(trackPath(directory, id, 'renders', 'current.json'), null); }
 export function readVersions(directory, id) { return readJson(trackPath(directory, id, 'renders', 'index.json'), []); }
 
-let engineHash;
-function engineIdentity() {
-  if (!engineHash) {
-    const hash = crypto.createHash('sha256').update(VERSION);
-    for (const file of ['score.js', 'render.js', 'catalog.js', ...fs.readdirSync(path.join(ROOT, 'src/audio')).filter(n => n.endsWith('.js')).map(n => 'audio/' + n)]) {
-      const full = path.join(ROOT, 'src', file); if (fs.existsSync(full)) hash.update(fs.readFileSync(full));
-    }
-    engineHash = hash.digest('hex');
-  }
-  return engineHash;
-}
 export function resolveSample(directory, asset) {
   if (asset.startsWith('builtin:')) {
     const id = requireId(asset.slice(8));
@@ -88,10 +75,9 @@ export function resolveSample(directory, asset) {
   if (!real.startsWith(assets + path.sep)) throw new Error('Voice samples must stay inside the library assets folder.');
   return full;
 }
+// The same revision a server computes for this score and mix (headless.js).
 export function sourceIdentity(directory, score, mix, sampleRate = 44100) {
-  const hash = crypto.createHash('sha256').update(JSON.stringify({ score, mix, sampleRate, engine: engineIdentity() }));
-  for (const part of score.parts ?? []) if (part.sample?.asset) hash.update(fs.readFileSync(resolveSample(directory, part.sample.asset)));
-  return hash.digest('hex').slice(0, 24);
+  return engine.revision(score, { mix, sampleRate, projectDir: libraryPath(directory) });
 }
 
 export async function addTrack(directory, input, { replace = false } = {}) {
@@ -186,7 +172,13 @@ export function trackInfo(directory, id, { detail = false } = {}) {
     sections: (score.sections ?? []).map(s => ({ id: s.id, name: s.name, start: s.beat * seconds, end: (s.beat + s.beats) * seconds })),
     parts: (score.parts ?? []).map((p, i) => ({ id: p.id, name: p.name ?? p.id, instrument: p.instrument, volume: mix.parts?.[p.id]?.volume ?? p.volume ?? 1, pan: mix.parts?.[p.id]?.pan ?? p.pan ?? 0, mute: mix.parts?.[p.id]?.mute ?? false, solo: mix.parts?.[p.id]?.solo ?? false, color: p.color ?? ['#ef946b', '#a9bce8', '#b9d0ac', '#b69ccf', '#e2ce87'][i % 5] })),
   };
-  if (detail) Object.assign(info, { score, mix: { ...mix, master: { volume: score.master?.volume ?? 0.8, ...mix.master } }, report, feedback: readJson(trackPath(directory, id, 'feedback.json'), []) });
+  if (detail) {
+    Object.assign(info, { score, mix: { ...mix, master: { volume: score.master?.volume ?? 0.8, ...mix.master } }, report, feedback: readJson(trackPath(directory, id, 'feedback.json'), []) });
+    // The studio draws version 2 pattern strings from their compiled notes.
+    if (score.version === 2) {
+      try { const expanded = engine.compile(score); info.arrangement = { bpm: expanded.bpm, parts: expanded.parts.map(({ id: part, name, notes }) => ({ id: part, name, notes })) }; } catch { /* invalid scores show parts without notes */ }
+    }
+  }
   return info;
 }
 export function getLibrary(directory, jobs = []) {
@@ -198,7 +190,7 @@ export function getLibrary(directory, jobs = []) {
   return { collection, tracks, jobs, directory: libraryPath(directory) };
 }
 
-export async function renderTrack(directory, id, { sampleRate = 44100, stems = false, progress } = {}) {
+export async function renderTrack(directory, id, { sampleRate = 44100, stems = false, progress, log } = {}) {
   const score = readScore(directory, id), mix = readMix(directory, id), revision = sourceIdentity(directory, score, mix, sampleRate);
   const dir = trackPath(directory, id, 'renders'); fs.mkdirSync(dir, { recursive: true });
   const wavFile = trackPath(directory, id, 'renders', revision + '.wav');
@@ -207,19 +199,14 @@ export async function renderTrack(directory, id, { sampleRate = 44100, stems = f
   const cached = fs.existsSync(wavFile) && fs.existsSync(reportFile) && (!stems || fs.existsSync(stemsDir));
   let report;
   if (!cached) {
-    const { renderScore } = await import('./render.js');
-    const result = await renderScore(score, { sampleRate, mix, projectDir: libraryPath(directory), stems, progress, resolveSample: asset => resolveSample(directory, asset) });
-    const audio = result.audio;
-    const channels = Array.from({ length: audio.numberOfChannels }, (_, i) => audio.getChannelData(i));
-    report = { ...result.report, ...analyzeAudio(channels, audio.sampleRate), revision, source: 'editable-score' };
-    report.warnings = [...new Set([...(result.report?.warnings ?? []), ...technicalWarnings(report)])];
-    if (report.nonFinite || report.clipped) throw new Error('The render failed audio checks: ' + JSON.stringify(report.warnings));
-    const temporary = wavFile + '.tmp'; fs.writeFileSync(temporary, Buffer.from(encodeWav(audio)), { mode: 0o600 }); fs.renameSync(temporary, wavFile);
+    const result = await engine.render(score, { sampleRate, mix, projectDir: libraryPath(directory), stems, progress, speech: { log } });
+    report = result.report;
+    const temporary = wavFile + '.tmp'; fs.writeFileSync(temporary, result.wav, { mode: 0o600 }); fs.renameSync(temporary, wavFile);
     writeJson(reportFile, report);
     if (stems && result.stems) {
       fs.mkdirSync(stemsDir, { recursive: true });
-      for (const [partId, buffer] of Object.entries(result.stems)) {
-        requireId(partId); fs.writeFileSync(path.join(stemsDir, partId + '.wav'), Buffer.from(encodeWav(buffer)), { mode: 0o600 });
+      for (const [partId, bytes] of Object.entries(result.stems)) {
+        requireId(partId); fs.writeFileSync(path.join(stemsDir, partId + '.wav'), bytes, { mode: 0o600 });
       }
       writeJson(path.join(stemsDir, 'notes.json'), { note: 'Dry instrument stems include part volume, pan, mute and solo. Shared master reverb, compression and gain are in the master WAV only.', revision });
     }
@@ -234,13 +221,5 @@ export async function renderTrack(directory, id, { sampleRate = 44100, stems = f
 }
 
 export async function midiForTrack(directory, id) {
-  const score = readScore(directory, id), { compileScore } = await scoreModule();
-  const expanded = compileScore(score);
-  const { getCatalog } = await import('./catalog.js');
-  const presets = new Map(getCatalog().instruments.map(p => [p.id, p]));
-  const percussion = { kick: 36, snare: 38, clap: 39, 'hi-hat': 42, shaker: 70, 'rock-kick': 36, 'rock-snare': 38, tom: 45, crash: 49, ride: 51, 'open-hat': 46 };
-  // GM toms occupy a sparse range; other pitches would select cymbals or effects.
-  const tomPitch = pitch => [41, 43, 45, 47, 48, 50].reduce((a, b) => Math.abs(b - pitch) < Math.abs(a - pitch) ? b : a);
-  const notesScore = expanded.parts ? expanded : expanded.score ?? score;
-  return encodeMidi({ title: score.title, bpm: score.bpm, sections: score.sections ?? [], tracks: (notesScore.parts ?? []).filter(p => !['sample', 'noise'].includes(p.instrument)).map(p => ({ name: p.name ?? p.id, program: presets.get(p.instrument)?.program ?? 80, drums: p.instrument in percussion, notes: (p.notes ?? []).map(n => ({ ...n, pitch: p.instrument === 'tom' ? tomPitch(n.pitch) : percussion[p.instrument] ?? n.pitch })) })) });
+  return engine.midi(readScore(directory, id));
 }

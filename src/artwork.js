@@ -7,7 +7,7 @@ const PALETTES = [
   ['#082b28', '#84d5af', '#d7f29a'], ['#412116', '#ea9378', '#eec89c'],
   ['#161826', '#98a6ee', '#e7e0fe'], ['#f0d832', '#253734', '#fff5c5'],
 ];
-const STYLES = ['orbit', 'strata', 'window', 'wave', 'sun', 'petal', 'ripple', 'monolith', 'weave', 'constellation'];
+export const SLEEVE_STYLES = ['orbit', 'strata', 'window', 'wave', 'sun', 'petal', 'ripple', 'monolith', 'weave', 'constellation'];
 const escape = value => String(value).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' }[c]));
 const color = (value, fallback) => /^#[0-9a-f]{6}$/i.test(value ?? '') ? value : fallback;
 
@@ -19,7 +19,7 @@ export function coverSvg(track = {}, { index } = {}) {
   const requested = track.artwork?.colors ?? track.artwork?.palette;
   const colors = Array.isArray(requested) ? requested.map((v, i) => color(v, palette[i % 3])) : palette;
   const [bg, ink, light] = [colors[0] ?? palette[0], colors[1] ?? palette[1], colors[2] ?? palette[2]];
-  const style = STYLES.includes(track.artwork?.style) ? track.artwork.style : STYLES[(Number.isInteger(index) && index >= 0 ? index : seed) % STYLES.length];
+  const style = SLEEVE_STYLES.includes(track.artwork?.style) ? track.artwork.style : SLEEVE_STYLES[(Number.isInteger(index) && index >= 0 ? index : seed) % SLEEVE_STYLES.length];
   const shape = [];
   const add = value => shape.push(value);
   if (style === 'orbit') {

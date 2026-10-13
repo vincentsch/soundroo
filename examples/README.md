@@ -4,6 +4,8 @@
 
 Both collections are labeled `source: "examples"`; neither generates personalized music or invokes a model or online service.
 
+`paper-satellites.json` is a single built-in example in score version 2, labeled `origin: "example"`. Its drums are `steps` strings and its bass, chords, hook and countermelody are `line` strings, so about 5 KB of JSON expands into roughly 1,300 notes and 81 seconds of music. It demonstrates the notation; it is not personalized music.
+
 ## The Open Window
 
 `collection.js` exports `buildExampleCollection({seed=1,durationScale=1})`, returning collection metadata and ten editable version-1 scores. “The Open Window” is a built-in demonstration, explicitly labeled `source: "examples"`. These compositions are not personalized user music. Each has its own original motifs, instrumentation, harmonic movement, sections and ending. No model or online service is invoked.

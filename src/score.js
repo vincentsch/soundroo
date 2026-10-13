@@ -1,22 +1,18 @@
-import { getCatalog, SAMPLE_ASSETS, SAMPLE_EFFECTS, SCORE_LIMITS } from './catalog.js';
+import { getCatalog, SAMPLE_ASSETS, SAMPLE_EFFECTS, SCORE_LIMITS, SPEECH_VOICES, DEFAULT_SPEECH_VOICE } from './catalog.js';
+import { parsePitch, parseLine, parseSteps } from './notation.js';
 
+export { parsePitch };
+export const SCORE_VERSIONS = Object.freeze([1, 2]);
 const slug = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const object = value => value !== null && typeof value === 'object' && !Array.isArray(value);
 const instruments = new Map(getCatalog().instruments.map(item => [item.id, item]));
 
-export function parsePitch(pitch) {
-  if (Number.isInteger(pitch) && pitch >= 0 && pitch <= 127) return pitch;
-  if (typeof pitch === 'string') {
-    const match = /^([A-Ga-g])([#b]?)(-?\d{1,2})$/.exec(pitch);
-    if (match) {
-      const pc = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 }[match[1].toUpperCase()];
-      const midi = (Number(match[3]) + 1) * 12 + pc + (match[2] === '#' ? 1 : match[2] === 'b' ? -1 : 0);
-      if (midi >= 0 && midi <= 127) return midi;
-    }
-  }
-  throw new TypeError('Expected a MIDI integer 0–127 or scientific pitch such as C#4.');
-}
+// Speech text is compared and cached after collapsing whitespace.
+export function speechText(text) { return text.trim().replace(/\s+/g, ' '); }
 
+// Version 2 adds pattern strings (see notation.js). Both versions compile to
+// the same ordinary version 1 note lists; older engines refuse version 2
+// instead of silently dropping the notes its strings describe.
 function normalize(score) {
   const issues = [];
   const issue = (path, message) => issues.push({ path, message });
@@ -35,7 +31,8 @@ function normalize(score) {
     return value;
   };
   if (!object(score)) return { issues: [{ path: '$', message: 'Expected a score object.' }] };
-  if (score.version !== 1) issue('version', 'Only score version 1 is supported.');
+  if (!SCORE_VERSIONS.includes(score.version)) issue('version', 'Use score version 1, or version 2 for pattern strings.');
+  const compact = score.version === 2;
   const bpm = number(score.bpm, 'bpm', 20, 400);
   const beats = number(score.beats, 'beats', 0, SCORE_LIMITS.maxSeconds * bpm / 60, undefined, true);
   const out = { version: 1, id: id(score.id, 'id'), title: text(score.title, 'title'), description: text(score.description, 'description'), genre: text(score.genre, 'genre'), mood: text(score.mood, 'mood'), key: text(score.key, 'key'), bpm, beats, seed: number(score.seed, 'seed', 0, 0xffffffff, 1), master: {}, sections: [], parts: [] };
@@ -80,6 +77,37 @@ function normalize(score) {
       return [{ pitch, beat, duration, velocity }];
     });
   };
+  const strings = (pattern, path, end) => {
+    const fields = ['line', 'steps'].filter(field => pattern[field] !== undefined);
+    if (!compact) { for (const field of fields) issue(`${path}.${field}`, 'Pattern strings need score version 2.'); return []; }
+    if (pattern.pitch !== undefined && pattern.steps === undefined) issue(`${path}.pitch`, 'pitch sets the note of steps hits; use it with steps.');
+    const result = [];
+    for (const field of fields) {
+      const source = pattern[field];
+      if (typeof source !== 'string' || source.length > SCORE_LIMITS.maxNotationCharacters) { issue(`${path}.${field}`, `Expected a string up to ${SCORE_LIMITS.maxNotationCharacters} characters.`); continue; }
+      let pitch = 60;
+      if (field === 'steps' && pattern.pitch !== undefined) { try { pitch = parsePitch(pattern.pitch); } catch (error) { issue(`${path}.pitch`, error.message); } }
+      const parsed = field === 'line' ? parseLine(source, end) : parseSteps(source, end, pitch);
+      for (const message of parsed.issues) issue(`${path}.${field}`, message);
+      result.push(...parsed.notes);
+    }
+    const available = Math.max(0, SCORE_LIMITS.maxEvents - sourceNoteCount);
+    sourceNoteCount += result.length;
+    if (sourceNoteCount > SCORE_LIMITS.maxEvents) issue(path, 'Score source exceeds 100000 note events, including pattern definitions.');
+    return result.slice(0, available);
+  };
+  const recipes = new Set();
+  const speech = (recipe, path) => {
+    if (!object(recipe)) { issue(path, 'Expected a speech recipe {text, voice}.'); return { text: '', voice: DEFAULT_SPEECH_VOICE }; }
+    for (const key of Object.keys(recipe)) if (key !== 'text' && key !== 'voice') issue(`${path}.${key}`, 'Speech recipes contain text and voice only.');
+    const words = typeof recipe.text === 'string' ? speechText(recipe.text) : '';
+    if (!words || words.length > SCORE_LIMITS.maxSpeechCharacters) issue(`${path}.text`, `Write the words to speak, up to ${SCORE_LIMITS.maxSpeechCharacters} characters.`);
+    const voice = recipe.voice ?? DEFAULT_SPEECH_VOICE;
+    if (!SPEECH_VOICES.includes(voice)) issue(`${path}.voice`, `Use a Kokoro voice such as af_heart or am_michael; the catalog lists all ${SPEECH_VOICES.length}.`);
+    recipes.add(JSON.stringify([words, voice]));
+    if (recipes.size === SCORE_LIMITS.maxSpeechRecipes + 1) issue(path, `Use at most ${SCORE_LIMITS.maxSpeechRecipes} different speech recipes in one score.`);
+    return { text: words, voice };
+  };
   for (const [i, part] of (Array.isArray(score.parts) ? score.parts.slice(0, SCORE_LIMITS.maxParts) : []).entries()) {
     const path = `parts[${i}]`;
     if (!object(part)) { issue(path, 'Expected a part object.'); continue; }
@@ -88,6 +116,7 @@ function normalize(score) {
     const p = { id: id(part.id, `${path}.id`), name: text(part.name, `${path}.name`, part.id), instrument: part.instrument, volume: number(part.volume, `${path}.volume`, 0, 2, 1), pan: number(part.pan, `${path}.pan`, -1, 1, 0), color: text(part.color, `${path}.color`, '#8aaea0'), tone: {}, notes: notes(part.notes, `${path}.notes`, beats) };
     if (partIds.has(part.id)) issue(`${path}.id`, 'Part IDs must be unique.');
     partIds.add(part.id);
+    for (const field of ['line', 'steps']) if (part[field] !== undefined) issue(`${path}.${field}`, 'Put line and steps strings in a named pattern (score version 2), then place it with a clip.');
     if (part.tone !== undefined && !object(part.tone)) issue(`${path}.tone`, 'Expected a tone controls object.');
     for (const [name, value] of Object.entries(object(part.tone) ? part.tone : {})) {
       const spec = preset?.controls[name];
@@ -104,7 +133,9 @@ function normalize(score) {
         if (!slug.test(name)) issue(pp, 'Pattern names must be lowercase slug tokens.');
         if (!object(pattern)) { issue(pp, 'Expected a pattern object.'); continue; }
         const length = number(pattern.beats, `${pp}.beats`, 0, beats, undefined, true);
-        patternMap.set(name, { beats: length, notes: notes(pattern.notes, `${pp}.notes`, length) });
+        const patternNotes = notes(pattern.notes, `${pp}.notes`, length);
+        patternNotes.push(...strings(pattern, pp, length));
+        patternMap.set(name, { beats: length, notes: patternNotes });
       }
     }
     const clips = part.clips ?? [];
@@ -138,14 +169,21 @@ function normalize(score) {
       if (!object(sample)) issue(`${path}.sample`, 'Sample parts need a sample configuration.');
       else {
         const sp = `${path}.sample`;
-        const builtin = typeof sample.asset === 'string' && sample.asset.startsWith('builtin:');
-        const local = typeof sample.asset === 'string' && /^assets\/(?:[^/\\]+\/)*[^/\\]+\.wav$/i.test(sample.asset) && !sample.asset.split('/').some(s => s === '..' || s === '.');
-        if (!(builtin ? SAMPLE_ASSETS.includes(sample.asset.slice(8)) : local)) issue(`${sp}.asset`, 'Use a supported builtin: phrase or a relative assets/ WAV path.');
+        let source;
+        if (sample.speech !== undefined) {
+          if (sample.asset !== undefined) issue(sp, 'Use either an asset or a speech recipe, not both.');
+          source = { speech: speech(sample.speech, `${sp}.speech`) };
+        } else {
+          const builtin = typeof sample.asset === 'string' && sample.asset.startsWith('builtin:');
+          const local = typeof sample.asset === 'string' && /^assets\/(?:[^/\\]+\/)*[^/\\]+\.wav$/i.test(sample.asset) && !sample.asset.split('/').some(s => s === '..' || s === '.');
+          if (!(builtin ? SAMPLE_ASSETS.includes(sample.asset.slice(8)) : local)) issue(`${sp}.asset`, 'Use a supported builtin: phrase, a relative assets/ WAV path, or a speech recipe.');
+          source = { asset: sample.asset };
+        }
         const effect = sample.effect ?? 'dry';
         if (!SAMPLE_EFFECTS.includes(effect)) issue(`${sp}.effect`, 'Unknown sample effect.');
         let pitch = 57;
         try { pitch = parsePitch(sample.pitch ?? 57); } catch (error) { issue(`${sp}.pitch`, error.message); }
-        p.sample = { asset: sample.asset, effect, pitch, semitones: number(sample.semitones, `${sp}.semitones`, -24, 24, 0), stretch: number(sample.stretch, `${sp}.stretch`, 0.25, 4, 1) };
+        p.sample = { ...source, effect, pitch, semitones: number(sample.semitones, `${sp}.semitones`, -24, 24, 0), stretch: number(sample.stretch, `${sp}.stretch`, 0.25, 4, 1) };
         if (sample.pattern !== undefined) {
           if (!Array.isArray(sample.pattern) || !sample.pattern.length || sample.pattern.length > 128 || sample.pattern.some(v => v !== null && (!Number.isInteger(v) || v < -1 || v > 3))) issue(`${sp}.pattern`, 'Use 1–128 chop steps: slice indices 0–3, or null/-1 for rests.');
           else p.sample.pattern = [...sample.pattern];

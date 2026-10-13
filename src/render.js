@@ -8,9 +8,11 @@ import * as instruments from './audio/instruments.js';
 import { mtof } from './audio/dsp.js';
 import { makeRng, hashSeed } from './audio/rng.js';
 import { parseWav, toMono, resample } from './audio/pcm.js';
-import { tapePitch, granularVoice, vocodeVoice, chopVoice } from './audio/voice-effects.js';
+import { tapePitch, granularVoice, vocodeVoice, chopVoice, CHOP_PATTERN } from './audio/voice-effects.js';
 import { analyzeAudio, technicalWarnings } from './audio/analysis.js';
+import { speechAudio } from './speech.js';
 
+export const RENDER_LIMITS = Object.freeze({ minSampleRate: 8000, maxSampleRate: 96000, maxSampleSeconds: 60, maxSampleBytes: 32 * 1024 * 1024 });
 const presets = new Map(getCatalog().instruments.map(p => [p.id, p]));
 const ceiling = Math.pow(10, -1 / 20);
 const audioBuffer = (channels, sampleRate) => ({ length: channels[0].length, sampleRate, numberOfChannels: channels.length, getChannelData(index) { if (!Number.isInteger(index) || !channels[index]) throw new RangeError('Invalid audio channel.'); return channels[index]; } });
@@ -83,7 +85,29 @@ function schedule(synth, lane, note, part, beatSeconds, rng) {
   for (const voice of synth.pending.slice(start)) voice.layers = voice.layers.filter(layer => layer.freqEnv || layer.wave === WAVES.noise || layer.wave === WAVES.pink || layer.freq * Math.pow(2, Math.abs(layer.detune ?? 0) / 1200) < synth.sr * 0.45);
 }
 
-async function loadSample(sample, sampleRate, bpm, projectDir) {
+// The note values each instrument's synthesis above reads; a fingerprint
+// ignores the rest. Drums and samples ignore pitch, toms clamp it, and
+// struck or plucked sounds decay without reading duration.
+const UNPITCHED = new Set(['kick', 'snare', 'clap', 'hi-hat', 'shaker', 'rock-kick', 'rock-snare', 'crash', 'ride', 'open-hat', 'noise', 'sample']);
+const UNTIMED = new Set(['pluck', 'acid-bass', 'bell', 'marimba', 'kick', 'snare', 'clap', 'hi-hat', 'shaker', 'rock-kick', 'rock-snare', 'tom', 'crash', 'ride', 'open-hat']);
+export function audibleNote(instrument, { pitch, beat, duration, velocity }) {
+  return { pitch: UNPITCHED.has(instrument) ? null : instrument === 'tom' ? Math.max(35, Math.min(60, pitch)) : pitch, beat, duration: UNTIMED.has(instrument) ? null : duration, velocity };
+}
+// The sample settings each treatment in loadSample reads.
+export function audibleSample(sample) {
+  const effect = sample.effect;
+  return {
+    ...(sample.speech ? { speech: { text: sample.speech.text, voice: sample.speech.voice } } : { asset: sample.asset }),
+    effect,
+    ...(['tape', 'granular', 'chop'].includes(effect) ? { semitones: sample.semitones } : {}),
+    ...(effect === 'granular' ? { stretch: sample.stretch } : {}),
+    ...(effect === 'vocoder' ? { pitch: sample.pitch } : {}),
+    ...(effect === 'chop' ? { pattern: (sample.pattern ?? CHOP_PATTERN).map(v => v == null || v < 0 ? null : v) } : {}),
+  };
+}
+
+async function readSample(sample, projectDir, speech) {
+  if (sample.speech) return speechAudio(sample.speech, speech);
   let path;
   if (sample.asset.startsWith('builtin:')) path = new URL(`../assets/voices/${sample.asset.slice(8)}.wav`, import.meta.url);
   else {
@@ -94,10 +118,14 @@ async function loadSample(sample, sampleRate, bpm, projectDir) {
     if (local.startsWith(`..${sep}`) || local === '..' || local.startsWith(sep)) throw new Error('Sample asset must stay within the project assets directory.');
   }
   const info = await stat(path);
-  if (info.size > 32 * 1024 * 1024) throw new Error('Sample WAVs must be at most 32 MB.');
+  if (info.size > RENDER_LIMITS.maxSampleBytes) throw new Error('Sample WAVs must be at most 32 MB.');
   const bytes = await readFile(path);
-  const wav = parseWav(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength));
-  if (!Number.isFinite(wav.sampleRate) || wav.sampleRate < 8000 || wav.sampleRate > 192000 || !wav.channels.length || wav.channels.length > 8 || wav.channels[0].length > wav.sampleRate * 60) throw new Error('Sample WAVs need 1–8 channels, 8–192 kHz and at most 60 seconds.');
+  return parseWav(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength));
+}
+
+async function loadSample(sample, sampleRate, bpm, projectDir, speech) {
+  const wav = await readSample(sample, projectDir, speech);
+  if (!Number.isFinite(wav.sampleRate) || wav.sampleRate < 8000 || wav.sampleRate > 192000 || !wav.channels.length || wav.channels.length > 8 || wav.channels[0].length > wav.sampleRate * RENDER_LIMITS.maxSampleSeconds) throw new Error('Sample WAVs need 1–8 channels, 8–192 kHz and at most 60 seconds.');
   let data = resample(toMono(wav.channels), wav.sampleRate, sampleRate);
   if (data.some(v => !Number.isFinite(v))) throw new Error('Sample WAV contains non-finite audio.');
   switch (sample.effect) {
@@ -112,10 +140,11 @@ async function loadSample(sample, sampleRate, bpm, projectDir) {
 /** Render a deterministic stereo buffer. from/to are seconds on the score timeline.
  * Progress receives {phase,progress,fraction,seconds,duration}; return false or abort signal
  * to cancel. Stems are dry post-part-mix buses, before shared master processing.
+ * speech {cacheDir, synthesize, modelDir, offline, log} configures speech recipes (speech.js).
  */
-export async function renderScore(score, { sampleRate = 44100, mix = {}, projectDir, stems = false, from = 0, to, progress, signal } = {}) {
+export async function renderScore(score, { sampleRate = 44100, mix = {}, projectDir, stems = false, from = 0, to, progress, signal, speech } = {}) {
   const expandedScore = compileScore(score);
-  bounded(sampleRate, 8000, 96000, 'sampleRate');
+  bounded(sampleRate, RENDER_LIMITS.minSampleRate, RENDER_LIMITS.maxSampleRate, 'sampleRate');
   if (!Number.isInteger(sampleRate)) throw new TypeError('sampleRate must be an integer.');
   const beatSeconds = 60 / expandedScore.bpm, duration = expandedScore.beats * beatSeconds;
   bounded(from, 0, duration, 'from');
@@ -146,7 +175,7 @@ export async function renderScore(score, { sampleRate = 44100, mix = {}, project
     const rng = makeRng(hashSeed(expandedScore.seed, part.id));
     let sample, events;
     if (part.instrument === 'sample') {
-      sample = await loadSample(part.sample, sampleRate, expandedScore.bpm, projectDir);
+      sample = await loadSample(part.sample, sampleRate, expandedScore.bpm, projectDir, speech);
       events = part.notes.filter(n => n.beat * beatSeconds < end).map(n => ({ start: Math.round(n.beat * beatSeconds * sampleRate), length: Math.min(sample.length, Math.round(n.duration * beatSeconds * sampleRate)), velocity: n.velocity }));
     } else for (const note of part.notes) if (note.beat * beatSeconds < end) schedule(synth, lane, note, part, beatSeconds, rng);
     buses.push({ part, synth, sample, events, next: 0, active: [], left: new Float32Array(BLOCK), right: new Float32Array(BLOCK) });

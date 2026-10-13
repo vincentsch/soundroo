@@ -66,7 +66,7 @@ node bin/soundroo.js voice create "We are made of light" --out library/assets/ph
 node bin/soundroo.js voice process library/assets/phrase.wav --effect vocoder --pitch 60 --out library/assets/robot.wav
 ```
 
-The first speech generation downloads the model once. Instrumental music and effects on existing speech need no model download. These are processed speech and musical textures; Kokoro is not a natural singing model.
+A score can also name its words directly in a speech recipe; its first render speaks and caches them. The first speech generation downloads the model once. Instrumental music and effects on existing speech need no model download. These are processed speech and musical textures; Kokoro is not a natural singing model.
 
 ## Keep the music
 
@@ -76,7 +76,7 @@ MIDI keeps notes and timing with instrument mappings, rather than the exact synt
 
 ## Compose and extend
 
-Soundroo uses ordinary JSON scores and small JavaScript composition helpers. Named patterns and clips let an agent develop a motif without rewriting each note. Its 28 local instrument types include clean/crunch guitar, picked electric bass, rock drums and cymbals, electric piano, analog/FM leads, mallets, pads and processed speech. [The composing guide](docs/composing.md) includes a runnable example and the score format. [Musical directions](docs/musical-directions.md) covers riffs, hooks and grooves. [AGENTS.md](AGENTS.md) gives the complete agent workflow.
+Soundroo uses ordinary JSON scores and small JavaScript composition helpers. Named patterns and clips let an agent develop a motif without rewriting each note, and score version 2 writes drum steps and melodic lines as short strings. Its 28 local instrument types include clean/crunch guitar, picked electric bass, rock drums and cymbals, electric piano, analog/FM leads, mallets, pads and processed speech. [The composing guide](docs/composing.md) includes a runnable example and the score format. [Musical directions](docs/musical-directions.md) covers riffs, hooks and grooves. [AGENTS.md](AGENTS.md) gives the complete agent workflow. [The headless engine](docs/headless.md) validates, renders and identifies scores for servers and other tools.
 
 Useful commands:
 

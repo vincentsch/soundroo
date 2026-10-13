@@ -36,8 +36,11 @@ const definitions = [
 ];
 export const SAMPLE_ASSETS = ['made-of-light', 'stay-a-little', 'in-the-rhythm', 'city-never-sleeps', 'let-it-change', 'slow-down'];
 export const SAMPLE_EFFECTS = ['dry', 'tape', 'granular', 'vocoder', 'chop'];
-export const SCORE_LIMITS = Object.freeze({ maxSeconds: 600, maxParts: 64, maxEvents: 100000, maxPatterns: 128, maxClips: 4096 });
+// English voices of the optional local Kokoro-82M speech model.
+export const SPEECH_VOICES = ['af_heart', 'af_alloy', 'af_aoede', 'af_bella', 'af_jessica', 'af_kore', 'af_nicole', 'af_nova', 'af_river', 'af_sarah', 'af_sky', 'am_adam', 'am_echo', 'am_eric', 'am_fenrir', 'am_liam', 'am_michael', 'am_onyx', 'am_puck', 'am_santa', 'bf_alice', 'bf_emma', 'bf_isabella', 'bf_lily', 'bm_daniel', 'bm_fable', 'bm_george', 'bm_lewis'];
+export const DEFAULT_SPEECH_VOICE = 'af_heart';
+export const SCORE_LIMITS = Object.freeze({ maxSeconds: 600, maxParts: 64, maxEvents: 100000, maxPatterns: 128, maxClips: 4096, maxNotationCharacters: 16384, maxSpeechRecipes: 16, maxSpeechCharacters: 200 });
 const instruments = definitions.map(([id, name, description, program, controls]) => ({ id, name, description, program, drums: ['kick', 'snare', 'clap', 'hi-hat', 'shaker', 'rock-kick', 'rock-snare', 'tom', 'crash', 'ride', 'open-hat'].includes(id), controls }));
 export function getCatalog() {
-  return structuredClone({ version: 1, instruments, sampleAssets: SAMPLE_ASSETS.map(id => `builtin:${id}`), sampleEffects: SAMPLE_EFFECTS, limits: SCORE_LIMITS, mix: { volume: { min: 0, max: 2, default: 1 }, pan: { min: -1, max: 1, default: 0 }, mute: false, solo: false }, master: { volume: { min: 0, max: 2, default: 0.8 }, reverb: { min: 0, max: 1, default: 0.2 } } });
+  return structuredClone({ version: 1, instruments, sampleAssets: SAMPLE_ASSETS.map(id => `builtin:${id}`), sampleEffects: SAMPLE_EFFECTS, speechVoices: SPEECH_VOICES, limits: SCORE_LIMITS, mix: { volume: { min: 0, max: 2, default: 1 }, pan: { min: -1, max: 1, default: 0 }, mute: false, solo: false }, master: { volume: { min: 0, max: 2, default: 0.8 }, reverb: { min: 0, max: 1, default: 0.2 } } });
 }

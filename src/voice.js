@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import os from 'node:os';
 import { parseWav, resample, toMono } from './audio/pcm.js';
+import { loadKokoro } from './speech.js';
 import { encodeWav } from './audio/wav.js';
 import { tapePitch, granularVoice, vocodeVoice, chopVoice } from './audio/voice-effects.js';
 import { analyzeAudio } from './audio/analysis.js';
@@ -24,20 +24,7 @@ export async function createSpeech(text, outFile, { voice = 'af_heart', dtype = 
   if (typeof text !== 'string' || !text.trim() || text.length > 2000) throw new Error('Speech needs between 1 and 2,000 characters.');
   if (!/^[a-z]{2}_[a-z]+$/.test(voice)) throw new Error('Choose a Kokoro voice such as af_heart or am_michael.');
   if (!['fp32', 'fp16', 'q8', 'q4', 'q4f16'].includes(dtype)) throw new Error('Choose a supported voice model precision.');
-  let KokoroTTS, env;
-  try { ({ KokoroTTS } = await import('kokoro-js')); ({ env } = await import('@huggingface/transformers')); }
-  catch (error) {
-    if (error.code === 'ERR_MODULE_NOT_FOUND') throw new Error('Optional speech runtime is not installed. From the Soundroo source folder run: npm install --no-save --package-lock=false kokoro-js@1.2.1 @huggingface/transformers@3.8.1');
-    throw error;
-  }
-  env.cacheDir = cacheDir ?? path.join(process.env.SOUNDROO_CACHE ?? path.join(os.homedir(), '.cache', 'soundroo'), 'models');
-  env.allowRemoteModels = process.env.SOUNDROO_OFFLINE !== '1';
-  let last = 0;
-  const tts = await KokoroTTS.from_pretrained('onnx-community/Kokoro-82M-v1.0-ONNX', {
-    dtype, device: 'cpu', progress_callback: event => {
-      if (event.status === 'progress' && Date.now() - last > 1500) { last = Date.now(); log(`Voice model: ${Math.round(event.progress ?? 0)}%`); }
-    },
-  });
+  const tts = await loadKokoro({ dtype, modelDir: cacheDir, log });
   const audio = await tts.generate(text.trim(), { voice, speed: 1 });
   const buffer = audioBuffer([audio.audio], audio.sampling_rate);
   fs.mkdirSync(path.dirname(path.resolve(outFile)), { recursive: true });

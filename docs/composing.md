@@ -90,7 +90,7 @@ For a revision, change the score or its source script, use `add --replace`, then
 
 ## Score format
 
-Every score uses `version: 1`, a lowercase slug `id`, a title, `bpm`, the total length in quarter-note `beats`, and an array of instrument `parts`. Useful metadata includes `description`, `genre`, `mood`, `key`, an integer `seed`, and named `sections`.
+Every score uses `version: 1`, or `version: 2` for the compact pattern strings below, a lowercase slug `id`, a title, `bpm`, the total length in quarter-note `beats`, and an array of instrument `parts`. Useful metadata includes `description`, `genre`, `mood`, `key`, an integer `seed`, and named `sections`.
 
 | Field | Meaning |
 | --- | --- |
@@ -100,12 +100,30 @@ Every score uses `version: 1`, a lowercase slug `id`, a title, `bpm`, the total 
 | `master` | `{volume, reverb}`; volume 0–2, reverb 0–1. |
 | `parts` | `{id, name, instrument, volume, pan, color, tone, notes, patterns, clips, sample}`. |
 | `notes` | `{pitch, beat, duration, velocity}`. Pitch is a MIDI integer or scientific pitch such as `F#4`; velocity is greater than 0 and at most 1. |
-| `patterns` | Named blocks `{name: {beats, notes}}` with timing relative to the block. |
+| `patterns` | Named blocks `{name: {beats, notes}}` with timing relative to the block. Version 2 adds `line`, `steps` and `pitch`. |
 | `clips` | `{pattern, beat, repeat, transpose, velocity}`; repeat and transpose a named pattern at a score position. |
 | `tone` | Instrument-specific controls. Discover names and supported ranges with `catalog`. |
 | `artwork` | Optional sleeve metadata: `{style, colors: [background, ink, accent], seed}`. Colors use six-digit hex. |
 
-The renderer validates timing, identities, ranges, supported controls and expansion limits. Scores support up to ten minutes, 64 parts and 100,000 expanded note events. Named sections help the listener navigate; they do not constrain the musical meter. Fractional beats can express swing, irregular rhythms and human timing.
+The renderer validates timing, identities, ranges, supported controls and expansion limits. Scores support up to ten minutes, 64 parts and 100,000 expanded note events.
+
+## Compact notation (version 2)
+
+A version 2 score can write a pattern's notes as strings. They compile into ordinary notes, so everything else stays the same: patterns are placed with clips, and the studio, MIDI and stems see normal note events. A score with `version: 1` rejects these strings rather than ignoring them, and engines before 0.4.0 refuse version 2.
+
+```json
+"patterns": {
+  "beat": { "beats": 4, "steps": "X...x...|X...x.o." },
+  "pedal": { "beats": 2, "steps": "x.x.", "pitch": "C2" },
+  "hook": { "beats": 8, "line": "G4/.5 Eb5 [C4 Eb4 G4]/2@.6 -/1 C5/1/3 D5 Eb5 F5/2" }
+}
+```
+
+`steps` spreads its symbols evenly over the pattern's `beats`: sixteen symbols in four beats are sixteenth notes. `X` plays at velocity 0.95, `x` at 0.75 and `o` at 0.4; `.` rests; `|` and spaces only help reading. Each hit lasts one step at the pattern's `pitch`, which defaults to C4 and matters for pitched instruments and toms.
+
+`line` plays tokens one after another from the pattern's start. `pitch/duration@velocity` gives a note with its duration in beats and an optional velocity. A duration can be a decimal such as `.5` or a fraction such as `1/3` for triplets. It stays in effect until the next duration; the first defaults to one beat. Velocity applies to its own token and defaults to 0.7. `[C4 Eb4 G4]` sounds a chord, `-` rests, pitches are scientific names or MIDI numbers, and `|` and spaces separate tokens. A pattern can combine `notes`, `line` and `steps`; the line must fit within the pattern's `beats`.
+
+Validation names the string and the token or character at fault. A string holds at most 16,384 characters. [`examples/paper-satellites.json`](../examples/paper-satellites.json) is a complete version 2 example in about 5 KB. Named sections help the listener navigate; they do not constrain the musical meter. Fractional beats can express swing, irregular rhythms and human timing.
 
 Sleeve styles are `orbit`, `strata`, `window`, `wave`, `sun`, `petal`, `ripple`, `monolith`, `weave`, and `constellation`. Give a collection varied sleeves and a coherent palette, or omit artwork and let the studio assign distinct designs by track position. These are original generated SVGs; no image service is required.
 
@@ -144,6 +162,14 @@ A `sample` part uses a local WAV or built-in spoken phrase:
 ```
 
 The sample's treatment is fixed for that part. Separate sample parts can use different carrier pitches or effects. `duration` limits playback of each sample event. Treatments are `dry`, `tape`, `granular`, `vocoder` and `chop`. Speech is not singing; it can supply a phrase, a rhythm, a texture or a robotic hook. A new spoken phrase can be generated with the optional local voice command in the README.
+
+A speech recipe puts the words in the score instead of a WAV:
+
+```json
+"sample": { "speech": { "text": "Carry the lantern home.", "voice": "am_michael" }, "effect": "vocoder", "pitch": 63 }
+```
+
+The first render speaks each recipe with the optional local Kokoro model and caches the phrase, so later renders reuse the same audio. Recipes need the speech runtime from the README; instrumental parts never do. A recipe holds up to 200 characters, a score up to 16 different recipes, and `voice` is one of the 28 voices in `catalog` (default `af_heart`). Use `asset` or `speech`, not both.
 
 ## Library and studio
 

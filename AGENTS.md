@@ -15,7 +15,7 @@ Soundroo is a music creation toolkit for coding agents with a finished local lis
 
 When someone gives you this repository, create their music and deliver the studio. Make ten original tracks by default unless their brief specifies another count. Choose a coherent creative direction from the brief; if it is open-ended, surprise them with a varied artistic collection. Do not ask them to learn a score format, choose engineering options or install a music application.
 
-1. Check Node 22+ with `node bin/soundroo.js doctor`. Instrumental music, the studio and existing speech effects need no npm installation. Read `docs/composing.md`, discover instruments with `node bin/soundroo.js catalog`, and study the varied arrangements in `examples/variety.js` or the softer `examples/collection.js` for structure rather than copying their melodies.
+1. Check Node 22+ with `node bin/soundroo.js doctor`. Instrumental music, the studio and existing speech effects need no npm installation. Read `docs/composing.md` (including compact version 2 patterns and optional spoken-text recipes), discover instruments with `node bin/soundroo.js catalog`, and study the varied arrangements in `examples/variety.js` or the softer `examples/collection.js` for structure rather than copying their melodies.
 2. Create a new personal library with `node bin/soundroo.js init library/my-music --title "Collection name"`. Keep existing libraries intact. The default `start` collection is a clearly labeled demonstration; it is not personalized music.
 3. Write a composition script and editable JSON scores inside that library. Use the helpers in `src/compose.js`: `note`, `chordPitches`, `chordNotes`, `pattern`, `transformPattern`, `arrangePattern`, `arpeggiate`, and `makeSections`. The score contract and a complete runnable example are in `docs/composing.md`.
 4. Give each piece an original hook and a musical shape: a quick opening, verse/development, prechorus/build, chorus/drop, a contrast and a deliberate ending. Let the hook arrive within the first eight bars. Change harmony, rhythm, register, instrumentation and dynamics between tracks. A new seed or tempo on the same four-bar loop is not a collection. For an open-ended brief, include guitar-led rock, modern pop and rhythm-led dance/funk alongside a few focused work grooves. Do not default a whole collection to soft piano, mallets and pads. Use the guitar/bass and rock drum presets for rock, with riffs, backbeats, fills and contrasting choruses. Treat focus music as one intentional mode, not the default for all music. See docs/musical-directions.md.
@@ -28,6 +28,12 @@ When someone gives you this repository, create their music and deliver the studi
 The studio saves notes in `tracks/<id>/feedback.json` and musical requests in `requests/`. Read them on the next user request. A saved brief does not start a model automatically. Use `node bin/soundroo.js requests --library PATH --json`, process pending requests, and mark their JSON status `done` with the resulting track IDs after successful rendering. Preserve the original request and timestamps. Favorites, mix state and voice files stay in the user's library.
 
 Mix changes in the studio render a new version. If you edit notes, preserve `mix.json` unless the user asks for a new mix. The user's player volume is a listening preference; it does not change exports. WAV downloads contain the rendered mix. MIDI contains note data and instrument mappings; sampled speech/noise and the synthesized timbre are not preserved in MIDI. Stems omit shared master processing and need not sum to the mastered WAV.
+
+## Headless and compact composition
+
+`src/headless.js` exposes the same validation, rendering, MIDI and sleeve functions as the CLI. See `docs/headless.md`. Its engine hash identifies rendering/validation/identity source, independently of network/UI code. Version 2 scores accept compact `steps` and `line` strings in patterns; they compile to ordinary notes. `examples/paper-satellites.json` demonstrates a complete compact piece. Existing version 1 scores remain supported.
+
+Speech recipes use `sample.speech: {text, voice}` instead of a local WAV asset. The optional local Kokoro runtime speaks each recipe once and caches it. Recipe output is processed speech, not natural singing. Core instrumental creation remains Node-only.
 
 ## Voice and sound art
 

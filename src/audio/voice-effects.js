@@ -86,7 +86,8 @@ export function vocodeVoice(samples, sampleRate, { pitch = 57, bands = 12, dry =
   return output;
 }
 
-export function chopVoice(samples, sampleRate, { bpm = 120, divisions = 2, pattern = [0, 1, 0, 2, 1, 3, 2, 0], semitones = 0 } = {}) {
+export const CHOP_PATTERN = Object.freeze([0, 1, 0, 2, 1, 3, 2, 0]);
+export function chopVoice(samples, sampleRate, { bpm = 120, divisions = 2, pattern = CHOP_PATTERN, semitones = 0 } = {}) {
   const sliceCount = 4;
   const stepFrames = Math.round(sampleRate * 60 / bpm / divisions);
   const output = new Float32Array(stepFrames * pattern.length);
