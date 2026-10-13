@@ -36,7 +36,7 @@ export function trackPath(directory, id, ...segments) {
 }
 
 async function scoreModule() { return import('./score.js'); }
-export async function initLibrary(directory, { examples = false, exampleSet = 'variety', seed = 1, title = 'Your music', description = '' } = {}) {
+export async function initLibrary(directory, { examples = false, exampleSet = 'variety', seed = exampleSet === 'variety' ? 21 : 1, title = 'Your music', description = '' } = {}) {
   const root = libraryPath(directory), file = path.join(root, 'collection.json');
   if (fs.existsSync(file)) return readJson(file);
   fs.mkdirSync(root, { recursive: true });

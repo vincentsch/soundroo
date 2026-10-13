@@ -1,6 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { renderScore } from '../src/render.js';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { addTrack, midiForTrack } from '../src/project.js';
 
 const score = (instrument, tone = {}, pitch = 57) => ({ version: 1, id: 'strings', title: 'Strings', seed: 19, bpm: 120, beats: 6, master: { volume: 0.9, reverb: 0 }, parts: [{ id: 'guitar', instrument, tone, notes: [{ pitch, beat: 0, duration: 3, velocity: 0.85 }] }] });
 
@@ -36,4 +40,16 @@ test('rock drum bodies, cymbals and open hats produce different finite signals',
     signatures.add(r.audio.getChannelData(0).slice(0, 100).join(','));
   }
   assert.equal(signatures.size, 6);
+});
+
+test('MIDI preserves new guitar program and different pitches in a tom fill', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'soundroo-rock-midi-'));
+  try {
+    const s = score('guitar-crunch');
+    s.parts.push({ id: 'fill', instrument: 'tom', notes: [41, 45, 50].map((pitch, i) => ({ pitch, beat: i, duration: 0.2, velocity: 0.7 })) });
+    await addTrack(dir, s);
+    const midi = await midiForTrack(dir, s.id);
+    assert.ok(midi.includes(Buffer.from([0xc0, 29])));
+    for (const pitch of [41, 45, 50]) assert.ok(midi.includes(Buffer.from([0x99, pitch])), `tom ${pitch}`);
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });

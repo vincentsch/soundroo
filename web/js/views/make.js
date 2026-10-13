@@ -43,7 +43,7 @@ export function makeView() {
       maxlength: '4000',
       required: true,
       'aria-describedby': 'brief-hint brief-error',
-      placeholder: 'Late-night city walks: warm electric piano, soft rain, slow grooves around 80 BPM that drift between hope and melancholy…',
+      placeholder: 'Crunchy guitars, fast backbeats and huge hooks. Mix in some modern pop, disco and a few steady grooves for work…',
       value: draft.brief,
       oninput: event => {
         draft.brief = event.target.value;
@@ -106,6 +106,18 @@ export function makeView() {
             h('label', { for: 'brief' }, 'Describe the music'),
             briefInput,
             h('p', { class: 'hint', id: 'brief-hint' }, 'Give it a place, a feeling, or a sound. A few words are enough.')),
+          h('div', { class: 'field' },
+            h('p', { class: 'hint' }, 'Start with a sound'),
+            h('div', { class: 'chips' }, [
+              ['Rock and roll', 'Guitar-led rock and roll: boogie bass, crunchy riffs, strong backbeats, drum fills and hooks that arrive quickly. Give each piece a big chorus and its own identity.'],
+              ['Modern pop', 'Modern pop instrumentals with memorable lead hooks, moving bass, punchy drums and a clear verse-to-chorus lift. Vary dance-pop, indie guitar pop and soul/funk grooves.'],
+              ['Work grooves', 'Rhythmic music for working: UK garage, understated house, funk and liquid breakbeats. Keep a steady pulse and fewer foreground notes, with slow changes that hold interest.'],
+              ['Surprise me', 'A varied record with guitar-led rock, hook-driven pop, dance and funk, plus a few stylish work grooves. Distinct riffs and melodies, quick hooks and strong chorus contrasts.'],
+            ].map(([label, brief]) => h('button', { type: 'button', class: 'chip', onclick: () => {
+              draft.brief = brief; briefInput.value = brief;
+              draft.feel = []; chips.forEach(chip => chip.setAttribute('aria-pressed', 'false'));
+              changed();
+            } }, label)))),
           h('fieldset', { class: 'field' },
             h('legend', {}, 'Feel ', h('span', { class: 'optional' }, 'optional')),
             h('div', { class: 'chips' }, chips)),

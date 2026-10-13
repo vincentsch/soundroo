@@ -16,11 +16,11 @@ Give the pieces distinct melodies and arrangements, then open the local
 studio so I can listen. Keep the scores so we can change the music later.
 ```
 
-Try an idea like a rainy city after midnight, a sunlit electronic record, quiet piano and mallets, or a collection of strange little musical worlds. The agent is the composer; Soundroo provides the instruments, rendering and listening studio. It does not call a model or music service behind the scenes. Your coding agent is a separate tool with its own requirements and prices.
+Try a guitar-driven rock record, big-hook modern pop, disco and funk, a late-night breakbeat set, or grooves for a focused workday. The agent is the composer; Soundroo provides the instruments, rendering and listening studio. Your coding agent is a separate tool with its own requirements and prices.
 
 ## Listen first
 
-![Soundroo's local listening studio showing Signal Garden](docs/studio.jpg)
+![Soundroo's local listening studio showing Turn It Up](docs/studio.jpg)
 
 The studio gives your music a home: original record sleeves, a collection view, track lists, favorites, a queue and a persistent player. Open a track to see its sections, leave notes at particular moments or compare rendered versions. A full-screen listening view responds to the playing audio. Search, shuffle, repeat, keyboard controls and light/dark themes are built in.
 
@@ -36,7 +36,15 @@ cd soundroo
 node bin/soundroo.js start
 ```
 
-Open the local URL printed in the terminal. The first start prepares **The Open Window**, ten original example pieces across house, downtempo, ambient, synthwave, piano, broken beat, dub, kosmische, mallets and voice electronica. They are complete editable compositions with contrasting sections and endings, rather than ten randomized loops. The studio labels them as examples. They show the instrument palette; your agent creates a personal collection from your own brief.
+Open the local URL printed in the terminal. The first start prepares **Turn It Up**, ten original example pieces spanning guitar-led rock and roll, garage rock, modern pop, dance and focused grooves. Riffs, hooks, chorus lifts and drum fills give the pieces different identities. The studio labels them as examples; your agent creates a personal collection from your own brief.
+
+The softer **The Open Window** collection is also available:
+
+```bash
+node bin/soundroo.js start library/open-window --collection open-window
+```
+
+Existing libraries keep their music. Use a new library folder to try another example collection.
 
 The usual studio address is `http://127.0.0.1:4317`, so browser preferences and your listening position survive restarts. If that port is occupied, Soundroo prints another local address. Use `--port NUMBER` to choose one.
 
@@ -62,7 +70,7 @@ MIDI keeps notes and timing with instrument mappings, rather than the exact synt
 
 ## Compose and extend
 
-Soundroo uses ordinary JSON scores and small JavaScript composition helpers. Named patterns and clips let an agent develop a motif without rewriting each note. Its local instruments include electric piano, plucks, pads, bass, bells, mallets, analog and FM leads, percussion, acoustic-style approximations and processed speech. [The composing guide](docs/composing.md) includes a runnable example and the score format. [AGENTS.md](AGENTS.md) gives the complete agent workflow.
+Soundroo uses ordinary JSON scores and small JavaScript composition helpers. Named patterns and clips let an agent develop a motif without rewriting each note. Its 28 local instrument types include clean/crunch guitar, picked electric bass, rock drums and cymbals, electric piano, analog/FM leads, mallets, pads and processed speech. [The composing guide](docs/composing.md) includes a runnable example and the score format. [Musical directions](docs/musical-directions.md) covers riffs, hooks and grooves. [AGENTS.md](AGENTS.md) gives the complete agent workflow.
 
 Useful commands:
 

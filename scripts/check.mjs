@@ -3,6 +3,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { buildExampleCollection } from '../examples/collection.js';
+import { buildVarietyCollection } from '../examples/variety.js';
 import { validateScore } from '../src/score.js';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
@@ -20,10 +21,12 @@ function walk(directory) {
 }
 for (const directory of ['bin', 'src', 'examples', 'web']) walk(path.join(root, directory));
 if (!fs.existsSync(path.join(root, 'web/index.html'))) throw new Error('The browser studio entry point is missing.');
-const example = buildExampleCollection({ seed: 1 });
-if (example.tracks.length !== 10) throw new Error('The example collection must contain ten complete scores.');
-for (const score of example.tracks) {
-  const result = validateScore(score);
-  if (!result.valid) throw new Error(`Invalid example ${score.id}: ${JSON.stringify(result.issues)}`);
+const examples = [buildExampleCollection({ seed: 1 }), buildVarietyCollection({ seed: 1 })];
+for (const example of examples) {
+  if (example.tracks.length !== 10) throw new Error('Each example collection must contain ten complete scores.');
+  for (const score of example.tracks) {
+    const result = validateScore(score);
+    if (!result.valid) throw new Error(`Invalid example ${score.id}: ${JSON.stringify(result.issues)}`);
+  }
 }
-console.log(`Checked ${count} JavaScript files and all ten example scores.`);
+console.log(`Checked ${count} JavaScript files and all twenty example scores.`);
