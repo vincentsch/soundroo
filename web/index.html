@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="en" data-theme="light" data-motion="full">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#faf9f6">
+  <meta name="description" content="Soundroo listening studio: original music made with your coding agent.">
+  <title>Soundroo</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+  <script src="js/theme.js"></script>
+  <script type="module" src="js/app.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <a class="skip-link" href="#player">Skip to player</a>
+
+  <aside class="sidebar" id="sidebar">
+    <a class="brand" href="#/" aria-label="Soundroo, listen">
+      <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><use href="#logo"/></svg>
+      <span class="brand-name">Soundroo</span>
+    </a>
+    <form class="search-field sidebar-search" id="search-form" role="search">
+      <svg class="icon" aria-hidden="true"><use href="#i-search"/></svg>
+      <label class="visually-hidden" for="search">Search tracks</label>
+      <input id="search" type="search" placeholder="Search" autocomplete="off" spellcheck="false">
+      <kbd class="search-key" aria-hidden="true">/</kbd>
+    </form>
+    <nav class="nav" aria-label="Library">
+      <a href="#/" data-nav="home"><svg class="icon" aria-hidden="true"><use href="#i-listen"/></svg><span>Listen</span></a>
+      <a href="#/tracks" data-nav="tracks"><svg class="icon" aria-hidden="true"><use href="#i-tracks"/></svg><span>Tracks</span></a>
+      <a href="#/favorites" data-nav="favorites"><svg class="icon" aria-hidden="true"><use href="#i-heart"/></svg><span>Favorites</span><span class="nav-count" data-bind="favorites-count"></span></a>
+    </nav>
+    <div class="sidebar-foot">
+      <div class="jobs" id="jobs-indicator" role="status" hidden>
+        <span class="spinner" aria-hidden="true"></span>
+        <span id="jobs-text">Rendering</span>
+        <span class="jobs-bar" id="jobs-bar" aria-hidden="true"></span>
+      </div>
+      <div class="sidebar-tools">
+        <button type="button" class="icon-btn" id="open-settings" aria-label="Settings" title="Settings"><svg class="icon" aria-hidden="true"><use href="#i-settings"/></svg></button>
+        <button type="button" class="icon-btn" id="open-shortcuts" aria-label="Keyboard shortcuts" title="Keyboard shortcuts (?)"><svg class="icon" aria-hidden="true"><use href="#i-keyboard"/></svg></button>
+      </div>
+      <a class="btn btn-primary sidebar-cta" href="#/make" data-nav="make"><svg class="icon" aria-hidden="true"><use href="#i-sparkle"/></svg>Make music</a>
+    </div>
+  </aside>
+
+  <header class="topbar">
+    <a class="brand" href="#/" aria-label="Soundroo, listen">
+      <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><use href="#logo"/></svg>
+      <span class="brand-name">Soundroo</span>
+    </a>
+    <button type="button" class="icon-btn" data-open="settings" aria-label="Settings" title="Settings"><svg class="icon" aria-hidden="true"><use href="#i-settings"/></svg></button>
+  </header>
+
+  <main id="main" class="main" tabindex="-1"></main>
+
+  <aside id="queue-panel" class="queue-panel" aria-labelledby="queue-title" hidden>
+    <header class="queue-head">
+      <h2 id="queue-title" tabindex="-1">Queue</h2>
+      <button type="button" class="chip-btn" data-action="shuffle" aria-pressed="false"><svg class="icon" aria-hidden="true"><use href="#i-shuffle"/></svg>Shuffle</button>
+      <button type="button" class="chip-btn repeat-btn" data-action="repeat" data-mode="off"><svg class="icon when-repeat-all" aria-hidden="true"><use href="#i-repeat"/></svg><svg class="icon when-repeat-one" aria-hidden="true"><use href="#i-repeat-one"/></svg>Repeat</button>
+      <button type="button" class="icon-btn" data-action="queue" aria-label="Close queue" title="Close queue"><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></button>
+    </header>
+    <div class="queue-body" id="queue-body"></div>
+  </aside>
+
+  <section class="player" id="player" aria-label="Player" data-transport tabindex="-1">
+    <div class="player-controls">
+      <button type="button" class="icon-btn player-shuffle" data-action="shuffle" aria-pressed="false" aria-label="Shuffle" title="Shuffle (S)"><svg class="icon" aria-hidden="true"><use href="#i-shuffle"/></svg></button>
+      <button type="button" class="icon-btn" data-action="previous" aria-label="Previous track" title="Previous (Shift+←)"><svg class="icon" aria-hidden="true"><use href="#i-previous"/></svg></button>
+      <button type="button" class="icon-btn play-toggle" data-action="toggle" aria-label="Play" data-state="paused"><svg class="icon when-paused" aria-hidden="true"><use href="#i-play"/></svg><svg class="icon when-playing" aria-hidden="true"><use href="#i-pause"/></svg><span class="spinner when-loading" aria-hidden="true"></span></button>
+      <button type="button" class="icon-btn" data-action="next" aria-label="Next track" title="Next (Shift+→)"><svg class="icon" aria-hidden="true"><use href="#i-next"/></svg></button>
+      <button type="button" class="icon-btn repeat-btn player-repeat" data-action="repeat" data-mode="off" aria-label="Repeat: off"><svg class="icon when-repeat-all" aria-hidden="true"><use href="#i-repeat"/></svg><svg class="icon when-repeat-one" aria-hidden="true"><use href="#i-repeat-one"/></svg></button>
+    </div>
+    <div class="lcd">
+      <button type="button" class="lcd-art" data-action="fullscreen" aria-label="Open full-screen player" title="Full-screen player (F)">
+        <span class="lcd-art-inner" data-bind="art" data-empty-art="1"></span>
+        <svg class="icon lcd-expand" aria-hidden="true"><use href="#i-expand"/></svg>
+      </button>
+      <div class="lcd-text">
+        <a class="lcd-title" data-bind="title-link"><span data-bind="title">Not playing</span></a>
+        <span class="lcd-sub" data-bind="subtitle">Choose something to play</span>
+      </div>
+      <button type="button" class="icon-btn fav-toggle lcd-fav" data-action="favorite" aria-pressed="false" aria-label="Favorite" title="Favorite (L)"><svg class="icon heart-off" aria-hidden="true"><use href="#i-heart"/></svg><svg class="icon heart-on" aria-hidden="true"><use href="#i-heart-fill"/></svg></button>
+      <div class="lcd-seek">
+        <span class="time" data-bind="elapsed">–:––</span>
+        <input type="range" class="seek" data-bind="seek" aria-label="Seek" min="0" max="1" step="0.1" value="0" disabled>
+        <span class="time" data-bind="remaining">–:––</span>
+      </div>
+      <span class="mini-progress" data-bind="progress" aria-hidden="true"></span>
+    </div>
+    <div class="player-extra">
+      <button type="button" class="icon-btn" data-action="note" aria-label="Note this moment" title="Note this moment (N)"><svg class="icon" aria-hidden="true"><use href="#i-note"/></svg></button>
+      <button type="button" class="icon-btn" data-action="queue" aria-label="Queue" aria-expanded="false" aria-controls="queue-panel" title="Queue (Q)"><svg class="icon" aria-hidden="true"><use href="#i-queue"/></svg></button>
+      <div class="volume">
+        <button type="button" class="icon-btn mute-btn" data-action="mute" aria-pressed="false" aria-label="Mute" data-level="high"><svg class="icon when-high" aria-hidden="true"><use href="#i-volume-high"/></svg><svg class="icon when-low" aria-hidden="true"><use href="#i-volume-low"/></svg><svg class="icon when-mute" aria-hidden="true"><use href="#i-volume-mute"/></svg></button>
+        <input type="range" class="volume-range" data-bind="volume" aria-label="Volume" min="0" max="1" step="0.02" value="0.8">
+      </div>
+      <button type="button" class="icon-btn player-next-mobile" data-action="next" aria-label="Next track"><svg class="icon" aria-hidden="true"><use href="#i-next"/></svg></button>
+    </div>
+  </section>
+
+  <nav class="tabbar" aria-label="Sections">
+    <a href="#/" data-nav="home"><svg class="icon" aria-hidden="true"><use href="#i-listen"/></svg><span>Listen</span></a>
+    <a href="#/tracks" data-nav="tracks"><svg class="icon" aria-hidden="true"><use href="#i-tracks"/></svg><span>Tracks</span></a>
+    <a href="#/favorites" data-nav="favorites"><svg class="icon" aria-hidden="true"><use href="#i-heart"/></svg><span>Favorites</span></a>
+    <a href="#/make" data-nav="make"><svg class="icon" aria-hidden="true"><use href="#i-sparkle"/></svg><span>Make</span></a>
+  </nav>
+
+  <dialog class="np" id="np" aria-labelledby="np-title">
+    <div class="np-bg" aria-hidden="true"><div class="np-bg-art" data-np-bg></div></div>
+    <canvas class="np-viz" id="np-viz" aria-hidden="true"></canvas>
+    <div class="np-shell" data-transport>
+      <header class="np-top">
+        <button type="button" class="icon-btn np-close" data-np-close aria-label="Close full-screen player" title="Close (Esc)"><svg class="icon" aria-hidden="true"><use href="#i-chevron-down"/></svg></button>
+        <p class="np-context" data-bind="subtitle"></p>
+        <button type="button" class="chip-btn np-style" id="np-viz-style">Rings</button>
+      </header>
+      <div class="np-stage">
+        <div class="np-art" data-bind="art"></div>
+        <div class="np-info">
+          <h2 class="np-title" id="np-title"><a data-bind="title-link" data-np-close><span data-bind="title">Not playing</span></a></h2>
+          <p class="np-desc" id="np-desc"></p>
+          <ol class="np-sections" id="np-sections" aria-label="Sections"></ol>
+        </div>
+      </div>
+      <footer class="np-controls">
+        <div class="np-seek">
+          <div class="np-markers" id="np-markers"></div>
+          <input type="range" class="seek" data-bind="seek" aria-label="Seek" min="0" max="1" step="0.1" value="0" disabled>
+          <div class="np-times"><span class="time" data-bind="elapsed">–:––</span><span class="time" data-bind="remaining">–:––</span></div>
+        </div>
+        <div class="np-buttons">
+          <div class="np-side">
+            <button type="button" class="icon-btn fav-toggle" data-action="favorite" aria-pressed="false" aria-label="Favorite" title="Favorite (L)"><svg class="icon heart-off" aria-hidden="true"><use href="#i-heart"/></svg><svg class="icon heart-on" aria-hidden="true"><use href="#i-heart-fill"/></svg></button>
+            <button type="button" class="icon-btn" data-action="note" aria-label="Note this moment" title="Note this moment (N)"><svg class="icon" aria-hidden="true"><use href="#i-note"/></svg></button>
+          </div>
+          <div class="np-transport">
+            <button type="button" class="icon-btn" data-action="shuffle" aria-pressed="false" aria-label="Shuffle" title="Shuffle (S)"><svg class="icon" aria-hidden="true"><use href="#i-shuffle"/></svg></button>
+            <button type="button" class="icon-btn np-big" data-action="previous" aria-label="Previous track"><svg class="icon" aria-hidden="true"><use href="#i-previous"/></svg></button>
+            <button type="button" class="icon-btn play-toggle np-play" data-action="toggle" aria-label="Play" data-state="paused" autofocus><svg class="icon when-paused" aria-hidden="true"><use href="#i-play"/></svg><svg class="icon when-playing" aria-hidden="true"><use href="#i-pause"/></svg><span class="spinner when-loading" aria-hidden="true"></span></button>
+            <button type="button" class="icon-btn np-big" data-action="next" aria-label="Next track"><svg class="icon" aria-hidden="true"><use href="#i-next"/></svg></button>
+            <button type="button" class="icon-btn repeat-btn" data-action="repeat" data-mode="off" aria-label="Repeat: off"><svg class="icon when-repeat-all" aria-hidden="true"><use href="#i-repeat"/></svg><svg class="icon when-repeat-one" aria-hidden="true"><use href="#i-repeat-one"/></svg></button>
+          </div>
+          <div class="np-side np-side-end">
+            <div class="volume">
+              <button type="button" class="icon-btn mute-btn" data-action="mute" aria-pressed="false" aria-label="Mute" data-level="high"><svg class="icon when-high" aria-hidden="true"><use href="#i-volume-high"/></svg><svg class="icon when-low" aria-hidden="true"><use href="#i-volume-low"/></svg><svg class="icon when-mute" aria-hidden="true"><use href="#i-volume-mute"/></svg></button>
+              <input type="range" class="volume-range" data-bind="volume" aria-label="Volume" min="0" max="1" step="0.02" value="0.8">
+            </div>
+            <button type="button" class="icon-btn" data-action="queue" aria-label="Queue" aria-expanded="false" aria-controls="queue-panel" title="Queue (Q)"><svg class="icon" aria-hidden="true"><use href="#i-queue"/></svg></button>
+          </div>
+        </div>
+      </footer>
+    </div>
+  </dialog>
+
+  <dialog class="sheet" id="note-dialog" aria-labelledby="note-title">
+    <form class="sheet-body" id="note-form" novalidate>
+      <header class="sheet-head">
+        <h2 id="note-title">Note a moment</h2>
+        <button type="button" class="icon-btn" data-close aria-label="Close" title="Close"><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></button>
+      </header>
+      <p class="sheet-sub" id="note-track"></p>
+      <div class="field-row note-time-row">
+        <div class="field field-small">
+          <label for="note-time">At</label>
+          <input id="note-time" name="time" inputmode="decimal" autocomplete="off" spellcheck="false" required>
+        </div>
+        <button type="button" class="btn btn-quiet btn-small" id="note-now">Use current time</button>
+      </div>
+      <div class="field">
+        <label for="note-text">Note</label>
+        <textarea id="note-text" name="text" rows="4" maxlength="2000" required placeholder="What do you hear here? “Bring the bass in earlier” or “Love this chord change”"></textarea>
+      </div>
+      <p class="hint">Saved with this track. Your coding agent can read your notes when you ask it to revise the music.</p>
+      <p class="form-error" id="note-error" role="alert" hidden></p>
+      <footer class="sheet-foot">
+        <button type="button" class="btn btn-quiet" data-close>Cancel</button>
+        <button type="submit" class="btn btn-primary" id="note-save">Save note</button>
+      </footer>
+    </form>
+  </dialog>
+
+  <dialog class="sheet" id="settings-dialog" aria-labelledby="settings-title" data-light-dismiss>
+    <div class="sheet-body">
+      <header class="sheet-head">
+        <h2 id="settings-title">Settings</h2>
+        <button type="button" class="icon-btn" data-close aria-label="Close" title="Close"><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></button>
+      </header>
+      <fieldset class="segmented">
+        <legend>Appearance</legend>
+        <label><input type="radio" name="theme" value="system"><span>Automatic</span></label>
+        <label><input type="radio" name="theme" value="light"><span>Light</span></label>
+        <label><input type="radio" name="theme" value="dark"><span>Dark</span></label>
+      </fieldset>
+      <fieldset class="segmented">
+        <legend>Full-screen visualizer</legend>
+        <label><input type="radio" name="visualizer" value="rings"><span>Rings</span></label>
+        <label><input type="radio" name="visualizer" value="bars"><span>Bars</span></label>
+        <label><input type="radio" name="visualizer" value="wave"><span>Wave</span></label>
+      </fieldset>
+      <label class="check">
+        <input type="checkbox" id="set-motion">
+        <span><strong>Reduce motion</strong><small>Keeps the visualizer and record still. Your system setting is always respected.</small></span>
+      </label>
+      <label class="check">
+        <input type="checkbox" id="set-resume">
+        <span><strong>Pick up where I left off</strong><small>Reloads the last track, paused at the same moment. Nothing plays until you press play.</small></span>
+      </label>
+      <p class="hint">Settings are saved in this browser. Favorites, mixes, notes and requests are saved in the studio.</p>
+    </div>
+  </dialog>
+
+  <dialog class="sheet" id="shortcuts-dialog" aria-labelledby="shortcuts-title" data-light-dismiss>
+    <div class="sheet-body">
+      <header class="sheet-head">
+        <h2 id="shortcuts-title">Keyboard shortcuts</h2>
+        <button type="button" class="icon-btn" data-close aria-label="Close" title="Close"><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></button>
+      </header>
+      <dl class="shortcuts">
+        <div><dt><kbd>Space</kbd> or <kbd>K</kbd></dt><dd>Play or pause</dd></div>
+        <div><dt><kbd>←</kbd> <kbd>→</kbd></dt><dd>Back or forward 5 seconds</dd></div>
+        <div><dt><kbd>Shift</kbd> + <kbd>←</kbd> <kbd>→</kbd></dt><dd>Previous or next track</dd></div>
+        <div><dt><kbd>N</kbd></dt><dd>Note this moment</dd></div>
+        <div><dt><kbd>L</kbd></dt><dd>Favorite the playing track</dd></div>
+        <div><dt><kbd>F</kbd></dt><dd>Full-screen player</dd></div>
+        <div><dt><kbd>Q</kbd></dt><dd>Queue</dd></div>
+        <div><dt><kbd>S</kbd> / <kbd>R</kbd></dt><dd>Shuffle / repeat</dd></div>
+        <div><dt><kbd>M</kbd></dt><dd>Mute</dd></div>
+        <div><dt><kbd>/</kbd></dt><dd>Search</dd></div>
+        <div><dt><kbd>Esc</kbd></dt><dd>Close a panel or the full-screen player</dd></div>
+      </dl>
+    </div>
+  </dialog>
+
+  <div class="menu" id="menu" popover role="menu" aria-label="Options"></div>
+  <div class="toasts" id="toasts" aria-live="polite" aria-relevant="additions"></div>
+  <div class="visually-hidden" id="live" aria-live="polite"></div>
+  <audio id="audio" preload="metadata"></audio>
+
+  <template id="logo-template"><svg class="lcd-logo" viewBox="0 0 32 32" aria-hidden="true"><use href="#logo"/></svg></template>
+
+  <svg class="sprite" aria-hidden="true" focusable="false">
+    <symbol id="logo" viewBox="0 0 32 32">
+      <rect width="32" height="32" rx="9" style="fill: var(--logo-bg, #e0472b)"/>
+      <circle cx="13.2" cy="18.6" r="7.6" style="fill: var(--logo-ink, #fff4e8)"/>
+      <circle cx="13.2" cy="18.6" r="4.6" fill="none" stroke-opacity=".22" stroke-width=".8" style="stroke: var(--logo-bg, #e0472b)"/>
+      <circle cx="13.2" cy="18.6" r="2" style="fill: var(--logo-bg, #e0472b)"/>
+      <path d="M18.9 12.4c1.5-4 4.3-5.9 7.6-5.6" stroke-width="2.6" stroke-linecap="round" fill="none" style="stroke: var(--logo-ink, #fff4e8)"/>
+    </symbol>
+    <g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5.6v12.8a1 1 0 0 0 1.53.85l10.2-6.4a1 1 0 0 0 0-1.7L9.53 4.75A1 1 0 0 0 8 5.6z" fill="currentColor" stroke="none"/></symbol>
+      <symbol id="i-pause" viewBox="0 0 24 24"><rect x="6.2" y="5" width="4.2" height="14" rx="1.2" fill="currentColor" stroke="none"/><rect x="13.6" y="5" width="4.2" height="14" rx="1.2" fill="currentColor" stroke="none"/></symbol>
+      <symbol id="i-next" viewBox="0 0 24 24"><path d="M4.5 6.4v11.2a.9.9 0 0 0 1.4.75l8.2-5.6a.9.9 0 0 0 0-1.5L5.9 5.65a.9.9 0 0 0-1.4.75z" fill="currentColor" stroke="none"/><rect x="16.4" y="5.5" width="2.8" height="13" rx="1.1" fill="currentColor" stroke="none"/></symbol>
+      <symbol id="i-previous" viewBox="0 0 24 24"><path d="M19.5 6.4v11.2a.9.9 0 0 1-1.4.75l-8.2-5.6a.9.9 0 0 1 0-1.5l8.2-5.6a.9.9 0 0 1 1.4.75z" fill="currentColor" stroke="none"/><rect x="4.8" y="5.5" width="2.8" height="13" rx="1.1" fill="currentColor" stroke="none"/></symbol>
+      <symbol id="i-shuffle" viewBox="0 0 24 24"><path stroke="currentColor" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M3 7h3.2c2 0 3.2.9 4.3 2.7l2.6 4.6c1.1 1.8 2.3 2.7 4.3 2.7H21M3 17h3.2c1.4 0 2.4-.4 3.3-1.3M14.4 8.3c.9-.9 1.9-1.3 3.3-1.3H21M18 4l3 3-3 3M18 14l3 3-3 3"/></symbol>
+      <symbol id="i-repeat" viewBox="0 0 24 24"><path stroke="currentColor" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M4 11.5V9.8A3.8 3.8 0 0 1 7.8 6H19M16 3l3 3-3 3M20 12.5v1.7A3.8 3.8 0 0 1 16.2 18H5M8 21l-3-3 3-3"/></symbol>
+      <symbol id="i-repeat-one" viewBox="0 0 24 24"><path stroke="currentColor" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M4 11.5V9.8A3.8 3.8 0 0 1 7.8 6H19M16 3l3 3-3 3M20 12.5v1.7A3.8 3.8 0 0 1 16.2 18H5M8 21l-3-3 3-3M11.2 10.2l1.6-1v5.3"/></symbol>
+      <symbol id="i-heart" viewBox="0 0 24 24"><path stroke="currentColor" fill="none" stroke-width="1.8" stroke-linejoin="round" d="M12 19.6s-7.3-4.4-8.9-9C1.9 7.3 4 4.6 7 4.6c2 0 3.5 1.1 5 3 1.5-1.9 3-3 5-3 3 0 5.1 2.7 3.9 6-1.6 4.6-8.9 9-8.9 9z"/></symbol>
+      <symbol id="i-heart-fill" viewBox="0 0 24 24"><path fill="currentColor" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" d="M12 19.6s-7.3-4.4-8.9-9C1.9 7.3 4 4.6 7 4.6c2 0 3.5 1.1 5 3 1.5-1.9 3-3 5-3 3 0 5.1 2.7 3.9 6-1.6 4.6-8.9 9-8.9 9z"/></symbol>
+      <symbol id="i-queue" viewBox="0 0 24 24"><path stroke="currentColor" fill="none" stroke-width="1.8" stroke-linecap="round" d="M9 6.5h11M9 12h11M9 17.5h11"/><circle cx="4.6" cy="6.5" r="1.2" fill="currentColor"/><circle cx="4.6" cy="12" r="1.2" fill="currentColor"/><circle cx="4.6" cy="17.5" r="1.2" fill="currentColor"/></symbol>
+      <symbol id="i-play-next" viewBox="0 0 24 24"><path stroke="currentColor" fill="none" stroke-width="1.8" stroke-linecap="round" d="M4 6.5h11M4 11.5h11M4 16.5h6"/><path d="M14.5 13.8v6.4l5.4-3.2z" fill="currentColor"/></symbol>
+      <symbol id="i-volume-high" viewBox="0 0 24 24"><path d="M3.8 9.4v5.2h3.4l4.6 3.9V5.5L7.2 9.4z" fill="currentColor"/><path stroke="currentColor" fill="none" stroke-width="1.8" stroke-linecap="round" d="M15.4 9.2a4 4 0 0 1 0 5.6M17.9 6.6a7.6 7.6 0 0 1 0 10.8"/></symbol>
+      <symbol id="i-volume-low" viewBox="0 0 24 24"><path d="M3.8 9.4v5.2h3.4l4.6 3.9V5.5L7.2 9.4z" fill="currentColor"/><path stroke="currentColor" fill="none" stroke-width="1.8" stroke-linecap="round" d="M15.4 9.2a4 4 0 0 1 0 5.6"/></symbol>
+      <symbol id="i-volume-mute" viewBox="0 0 24 24"><path d="M3.8 9.4v5.2h3.4l4.6 3.9V5.5L7.2 9.4z" fill="currentColor"/><path stroke="currentColor" fill="none" stroke-width="1.8" stroke-linecap="round" d="M15.5 9.5l5 5M20.5 9.5l-5 5"/></symbol>
+      <symbol id="i-expand" viewBox="0 0 24 24"><path stroke="currentColor" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M14 4.5h5.5V10M10 19.5H4.5V14M19.5 4.5 14 10M4.5 19.5 10 14"/></symbol>
+      <symbol id="i-chevron-down" viewBox="0 0 24 24"><path stroke="currentColor" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M6 9.5l6 6 6-6"/></symbol>
+      <symbol id="i-chevron-left" viewBox="0 0 24 24"><path stroke="currentColor" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M14.5 6l-6 6 6 6"/></symbol>
+      <symbol id="i-chevron-right" viewBox="0 0 24 24"><path stroke="currentColor" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M9.5 6l6 6-6 6"/></symbol>
+      <symbol id="i-close" viewBox="0 0 24 24"><path stroke="currentColor" fill="none" stroke-width="1.8" stroke-linecap="round" d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></symbol>
+      <symbol id="i-more" viewBox="0 0 24 24"><circle cx="5.5" cy="12" r="1.7" fill="currentColor"/><circle cx="12" cy="12" r="1.7" fill="currentColor"/><circle cx="18.5" cy="12" r="1.7" fill="currentColor"/></symbol>
+      <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6" stroke="currentColor" fill="none" stroke-width="1.8"/><path stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="M15 15l4.8 4.8"/></symbol>
+      <symbol id="i-listen" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" stroke="currentColor" fill="none" stroke-width="1.8"/><circle cx="12" cy="12" r="2.4" stroke="currentColor" fill="none" stroke-width="1.8"/><path stroke="currentColor" fill="none" stroke-width="1.8" stroke-linecap="round" d="M12 6.2a5.8 5.8 0 0 1 5.8 5.8"/></symbol>
+      <symbol id="i-tracks" viewBox="0 0 24 24"><path stroke="currentColor" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M4 6.5h10M4 11.5h10M4 16.5h6M17.5 17.5V6.8l3-.8"/><circle cx="15.6" cy="17.6" r="2" stroke="currentColor" fill="none" stroke-width="1.8"/></symbol>
+      <symbol id="i-sparkle" viewBox="0 0 24 24"><path stroke="currentColor" fill="none" stroke-width="1.8" stroke-linejoin="round" d="M11 3.5l1.7 5 5 1.7-5 1.7-1.7 5-1.7-5-5-1.7 5-1.7z"/><path d="M18.3 15.2l.8 2.1 2.1.8-2.1.8-.8 2.1-.8-2.1-2.1-.8 2.1-.8z" fill="currentColor"/></symbol>
+      <symbol id="i-download" viewBox="0 0 24 24"><path stroke="currentColor" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M12 4v10.5M7.5 10l4.5 4.5 4.5-4.5M5 19.5h14"/></symbol>
+      <symbol id="i-note" viewBox="0 0 24 24"><path stroke="currentColor" fill="none" stroke-width="1.8" stroke-linejoin="round" d="M5.2 5h13.6c.9 0 1.7.8 1.7 1.7v8.1c0 .9-.8 1.7-1.7 1.7H12l-4.6 3.4v-3.4H5.2c-.9 0-1.7-.8-1.7-1.7V6.7C3.5 5.8 4.3 5 5.2 5z"/><path stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="M7.8 9.2h8.4M7.8 12.3h5.4"/></symbol>
+      <symbol id="i-sliders" viewBox="0 0 24 24"><path stroke="currentColor" fill="none" stroke-width="1.8" stroke-linecap="round" d="M6 4.5v15M12 4.5v15M18 4.5v15"/><rect x="3.8" y="13" width="4.4" height="3.2" rx="1" fill="currentColor"/><rect x="9.8" y="7" width="4.4" height="3.2" rx="1" fill="currentColor"/><rect x="15.8" y="11" width="4.4" height="3.2" rx="1" fill="currentColor"/></symbol>
+      <symbol id="i-layers" viewBox="0 0 24 24"><g stroke="currentColor" fill="none" stroke-width="1.8"><rect x="3.5" y="4.5" width="9.5" height="4" rx="1.2"/><rect x="9" y="10" width="11.5" height="4" rx="1.2"/><rect x="5.5" y="15.5" width="8" height="4" rx="1.2"/></g></symbol>
+      <symbol id="i-history" viewBox="0 0 24 24"><path stroke="currentColor" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M4.6 12.5A7.5 7.5 0 1 0 6.8 6.7M4.2 4.3v3.9h3.9M12 8v4.4l3 1.9"/></symbol>
+      <symbol id="i-file" viewBox="0 0 24 24"><path stroke="currentColor" fill="none" stroke-width="1.8" stroke-linejoin="round" d="M7 3.5h7l4.5 4.5v11A1.5 1.5 0 0 1 17 20.5H7A1.5 1.5 0 0 1 5.5 19V5A1.5 1.5 0 0 1 7 3.5z"/><path stroke="currentColor" fill="none" stroke-width="1.8" stroke-linejoin="round" d="M13.5 3.8V8.5h4.7M8.5 12.5h7M8.5 16h5"/></symbol>
+      <symbol id="i-piano" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="14" rx="1.6" stroke="currentColor" fill="none" stroke-width="1.8"/><path stroke="currentColor" stroke-width="1.8" d="M9.2 13v6M14.8 13v6"/><rect x="7.8" y="5" width="2.8" height="8" rx=".6" fill="currentColor"/><rect x="13.4" y="5" width="2.8" height="8" rx=".6" fill="currentColor"/></symbol>
+      <symbol id="i-wave" viewBox="0 0 24 24"><path stroke="currentColor" fill="none" stroke-width="1.8" stroke-linecap="round" d="M3.5 12h1.5M7.5 8.5v7M11 5v14M14.5 9v6M18 6.5v11M20.5 11v2"/></symbol>
+      <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" stroke="currentColor" fill="none" stroke-width="1.8"/><path stroke="currentColor" fill="none" stroke-width="1.8" d="M3.5 12h17M12 3.5c2.4 2.6 3.4 5.4 3.4 8.5s-1 5.9-3.4 8.5M12 3.5C9.6 6.1 8.6 8.9 8.6 12s1 5.9 3.4 8.5"/></symbol>
+      <symbol id="i-render" viewBox="0 0 24 24"><path stroke="currentColor" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M19.4 12.6a7.5 7.5 0 1 1-2.1-5.9M19.8 4.2v3.9h-3.9"/></symbol>
+      <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8.5" y="8.5" width="11" height="11" rx="2" stroke="currentColor" fill="none" stroke-width="1.8"/><path stroke="currentColor" fill="none" stroke-width="1.8" stroke-linejoin="round" d="M15.5 8.5V6a1.5 1.5 0 0 0-1.5-1.5H6A1.5 1.5 0 0 0 4.5 6v8A1.5 1.5 0 0 0 6 15.5h2.5"/></symbol>
+      <symbol id="i-trash" viewBox="0 0 24 24"><path stroke="currentColor" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M4.5 7h15M9.5 7V4.8h5V7M6.6 7l.9 12.5h9l.9-12.5M10 10.5v5.8M14 10.5v5.8"/></symbol>
+      <symbol id="i-plus" viewBox="0 0 24 24"><path stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="M12 5v14M5 12h14"/></symbol>
+      <symbol id="i-check" viewBox="0 0 24 24"><path stroke="currentColor" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
+      <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" stroke="currentColor" fill="none" stroke-width="1.8"/><path stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="M12 11v5.5"/><circle cx="12" cy="7.9" r="1.1" fill="currentColor"/></symbol>
+      <symbol id="i-alert" viewBox="0 0 24 24"><path stroke="currentColor" fill="none" stroke-width="1.8" stroke-linejoin="round" d="M12 4.2l8.6 15H3.4z"/><path stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="M12 10v4.4"/><circle cx="12" cy="16.9" r="1" fill="currentColor"/></symbol>
+      <symbol id="i-arrow-up" viewBox="0 0 24 24"><path stroke="currentColor" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M12 19V5.5M6.5 11 12 5.5 17.5 11"/></symbol>
+      <symbol id="i-arrow-down" viewBox="0 0 24 24"><path stroke="currentColor" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M12 5v13.5M6.5 13 12 18.5 17.5 13"/></symbol>
+      <symbol id="i-arrow-right" viewBox="0 0 24 24"><path stroke="currentColor" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M5 12h13.5M13 6.5l5.5 5.5-5.5 5.5"/></symbol>
+      <symbol id="i-settings" viewBox="0 0 24 24"><path stroke="currentColor" fill="none" stroke-width="1.8" stroke-linecap="round" d="M4 7.5h9.5M18.5 7.5H20M4 16.5h2.5M11.5 16.5H20"/><circle cx="16" cy="7.5" r="2.4" stroke="currentColor" fill="none" stroke-width="1.8"/><circle cx="9" cy="16.5" r="2.4" stroke="currentColor" fill="none" stroke-width="1.8"/></symbol>
+      <symbol id="i-keyboard" viewBox="0 0 24 24"><rect x="2.8" y="6" width="18.4" height="12" rx="2" stroke="currentColor" fill="none" stroke-width="1.8"/><path stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M6.5 10h.01M9.5 10h.01M12.5 10h.01M15.5 10h.01M17.5 10h.01M8 14.2h8"/></symbol>
+      <symbol id="i-save" viewBox="0 0 24 24"><path stroke="currentColor" fill="none" stroke-width="1.8" stroke-linejoin="round" d="M7 3.8h10a1 1 0 0 1 1 1v15.4l-6-4.2-6 4.2V4.8a1 1 0 0 1 1-1z"/></symbol>
+    </g>
+  </svg>
+</body>
+</html>

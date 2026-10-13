@@ -201,8 +201,9 @@ export async function renderScore(score, { sampleRate = 44100, mix = {}, project
   report.from = from;
   report.to = end;
   report.sections = expandedScore.sections.map(s => ({ ...s, time: s.beat * beatSeconds, duration: s.beats * beatSeconds }));
-  report.warnings = technicalWarnings(report);
   report.limitedFraction = limited / (frames * 2);
+  report.warnings = technicalWarnings(report);
+  if (report.limitedFraction > 0.001) report.warnings.push('The safety ceiling flattened more than 0.1% of samples. Lower part or master levels and render again.');
   report.stemDescription = 'Dry stereo buses after part volume, pan and mute/solo, before shared master reverb, compression, volume and safety limiting. They do not sum to the mastered render.';
   check('complete', end);
   return { audio: audioBuffer(channels, sampleRate), report, parts: expandedScore.parts.map(({ id, name, color }) => ({ id, name, color })), ...(stemBuffers ? { stems: Object.fromEntries(Object.entries(stemBuffers).map(([id, data]) => [id, audioBuffer(data, sampleRate)])) } : {}), expandedScore };

@@ -6,7 +6,7 @@ import { Worker } from 'node:worker_threads';
 import { pipeline } from 'node:stream/promises';
 import { coverSvg } from './artwork.js';
 import { zipStream } from './archive.js';
-import { ROOT, VERSION, requireId, libraryPath, getLibrary, trackInfo, readScore, readCurrent, readMix, readVersions, trackPath, saveState, saveMix, saveFeedback, deleteFeedback, saveRequest, readRequests, midiForTrack, sourceIdentity } from './project.js';
+import { ROOT, VERSION, requireId, libraryPath, getLibrary, trackInfo, readJson, readScore, readCurrent, readMix, readVersions, trackPath, saveState, saveMix, saveFeedback, deleteFeedback, saveRequest, readRequests, midiForTrack, sourceIdentity } from './project.js';
 
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.webp': 'image/webp', '.woff2': 'font/woff2', '.wav': 'audio/wav' };
 const escape = value => String(value).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -90,6 +90,7 @@ function sharePage(score, duration) {
 export async function startServer(directory, { port = 0, renderMissing = true, log = () => {} } = {}) {
   directory = libraryPath(directory);
   const queue = createRenderQueue(directory);
+  const artwork = score => coverSvg(score, { index: readJson(path.join(directory, 'collection.json')).tracks.indexOf(score.id) });
   let url;
   async function ensureAudio(id, { stems = false } = {}) {
     const current = readCurrent(directory, id), score = readScore(directory, id);
@@ -125,7 +126,7 @@ export async function startServer(directory, { port = 0, renderMissing = true, l
         if (action.startsWith('feedback/') && request.method === 'DELETE') { json(response, deleteFeedback(directory, id, action.slice(9))); return; }
         if (action === 'mix' && request.method === 'POST') { saveMix(directory, id, await jsonBody(request)); const job = queue.enqueue(id); json(response, { job: { id: job.id, status: job.status } }, 202); return; }
         if (action === 'render' && request.method === 'POST') { const job = queue.enqueue(id); json(response, { job: { id: job.id, status: job.status } }, 202); return; }
-        if (action === 'artwork' && request.method === 'GET') { const svg = coverSvg(readScore(directory, id)); response.writeHead(200, { 'content-type': 'image/svg+xml', 'cache-control': 'no-cache' }); response.end(svg); return; }
+        if (action === 'artwork' && request.method === 'GET') { const svg = artwork(readScore(directory, id)); response.writeHead(200, { 'content-type': 'image/svg+xml', 'cache-control': 'no-cache' }); response.end(svg); return; }
         if ((action === 'audio' || /^versions\/[a-f0-9]{24}\/audio$/.test(action)) && ['GET', 'HEAD'].includes(request.method)) {
           const revision = action === 'audio' ? readCurrent(directory, id)?.id : action.split('/')[1];
           if (!revision || !readVersions(directory, id).some(v => v.id === revision)) { json(response, { error: 'This track is still being rendered.' }, 404); return; }
@@ -145,7 +146,7 @@ export async function startServer(directory, { port = 0, renderMissing = true, l
               for (const file of fs.readdirSync(stemDir).filter(n => n.endsWith('.wav'))) entries.push({ name: 'stems/' + file, path: path.join(stemDir, file) });
               entries.push({ name: 'README.txt', bytes: 'Dry instrument stems include part volume, pan, mute and solo. Shared master reverb, compression and gain are in the master WAV only. MIDI preserves note data, not the instrument sound.\n' });
             } else {
-              entries.push({ name: 'index.html', bytes: sharePage(score, current.duration) }, { name: 'cover.svg', bytes: coverSvg(score) }, { name: 'track.wav', path: trackPath(directory, id, 'renders', current.id + '.wav') });
+              entries.push({ name: 'index.html', bytes: sharePage(score, current.duration) }, { name: 'cover.svg', bytes: artwork(score) }, { name: 'track.wav', path: trackPath(directory, id, 'renders', current.id + '.wav') });
             }
             response.writeHead(200, { 'content-type': 'application/zip', 'content-disposition': disposition(id + '-' + type + '.zip') });
             await pipeline(zipStream(entries), response); return;

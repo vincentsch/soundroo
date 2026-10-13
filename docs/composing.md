@@ -103,8 +103,13 @@ Every score uses `version: 1`, a lowercase slug `id`, a title, `bpm`, the total 
 | `patterns` | Named blocks `{name: {beats, notes}}` with timing relative to the block. |
 | `clips` | `{pattern, beat, repeat, transpose, velocity}`; repeat and transpose a named pattern at a score position. |
 | `tone` | Instrument-specific controls. Discover names and supported ranges with `catalog`. |
+| `artwork` | Optional sleeve metadata: `{style, colors: [background, ink, accent], seed}`. Colors use six-digit hex. |
 
 The renderer validates timing, identities, ranges, supported controls and expansion limits. Scores support up to ten minutes, 64 parts and 100,000 expanded note events. Named sections help the listener navigate; they do not constrain the musical meter. Fractional beats can express swing, irregular rhythms and human timing.
+
+Sleeve styles are `orbit`, `strata`, `window`, `wave`, `sun`, `petal`, `ripple`, `monolith`, `weave`, and `constellation`. Give a collection varied sleeves and a coherent palette, or omit artwork and let the studio assign distinct designs by track position. These are original generated SVGs; no image service is required.
+
+Part volume defaults to 1 and master volume to 0.8. The mix controls use the same defaults as the renderer. Render reports include `limitedFraction`: the fraction of samples flattened at the safety ceiling. If its warning appears, lower levels and render again; zero out-of-range samples alone does not mean the mix avoided limiting.
 
 ## Instruments and sound
 

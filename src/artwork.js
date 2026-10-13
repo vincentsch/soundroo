@@ -12,14 +12,14 @@ const escape = value => String(value).replace(/[&<>"']/g, c => ({ '&': '&amp;', 
 const color = (value, fallback) => /^#[0-9a-f]{6}$/i.test(value ?? '') ? value : fallback;
 
 // Original geometric record sleeves. No external assets, fonts or requests.
-export function coverSvg(track = {}) {
+export function coverSvg(track = {}, { index } = {}) {
   const seed = hashSeed(track.id ?? track.title ?? 'soundroo', track.artwork?.seed ?? 1);
   const rng = makeRng(seed);
-  const palette = PALETTES[seed % PALETTES.length];
+  const palette = PALETTES[(seed >>> 12) % PALETTES.length];
   const requested = track.artwork?.colors ?? track.artwork?.palette;
   const colors = Array.isArray(requested) ? requested.map((v, i) => color(v, palette[i % 3])) : palette;
   const [bg, ink, light] = [colors[0] ?? palette[0], colors[1] ?? palette[1], colors[2] ?? palette[2]];
-  const style = STYLES.includes(track.artwork?.style) ? track.artwork.style : STYLES[seed % STYLES.length];
+  const style = STYLES.includes(track.artwork?.style) ? track.artwork.style : STYLES[(Number.isInteger(index) && index >= 0 ? index : seed) % STYLES.length];
   const shape = [];
   const add = value => shape.push(value);
   if (style === 'orbit') {

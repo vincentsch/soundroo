@@ -48,8 +48,14 @@ try {
       for (const track of getLibrary(directory).tracks) { log(`Rendering ${track.title}`); const result = await renderTrack(directory, track.id, { stems: Boolean(options.stems) }); results.push({ id: track.id, duration: result.duration, revision: result.revision }); }
       print({ directory, tracks: results });
     } else {
-      const port = number('port', 0); if (!Number.isInteger(port) || port < 0 || port > 65535) throw new Error('Port must be an integer between 0 and 65535.');
-      const studio = await startServer(directory, { port, renderMissing: !options['no-render'], log });
+      const port = number('port', 4317); if (!Number.isInteger(port) || port < 0 || port > 65535) throw new Error('Port must be an integer between 0 and 65535.');
+      let studio;
+      try { studio = await startServer(directory, { port, renderMissing: !options['no-render'], log }); }
+      catch (error) {
+        if (error.code !== 'EADDRINUSE' || options.port != null) throw error;
+        log('The usual studio port is busy; opening another local address.');
+        studio = await startServer(directory, { port: 0, renderMissing: !options['no-render'], log });
+      }
       print(options.json ? { url: studio.url, directory, tracks: getLibrary(directory).tracks.length } : `Soundroo is listening at ${studio.url}\nMusic library: ${directory}\nOpen the link in your browser. Press Ctrl+C to close the studio.`);
       const close = async () => { await studio.close(); process.exit(0); };
       process.once('SIGINT', close); process.once('SIGTERM', close);
@@ -64,7 +70,7 @@ try {
     const tracks = options.all ? getLibrary(directory).tracks.map(t => t.id) : [positional[0]];
     if (!tracks[0]) throw new Error('Choose a track or use --all.');
     const results = [];
-    for (const id of tracks) { log(`Rendering ${id}`); const result = await renderTrack(directory, id, { stems: Boolean(options.stems), sampleRate: number('sample-rate', 44100) }); results.push({ id, revision: result.revision, duration: result.duration, file: result.file, report: { peakDb: result.report.peakDb, rmsDb: result.report.rmsDb, warnings: result.report.warnings } }); }
+    for (const id of tracks) { log(`Rendering ${id}`); const result = await renderTrack(directory, id, { stems: Boolean(options.stems), sampleRate: number('sample-rate', 44100) }); results.push({ id, revision: result.revision, duration: result.duration, file: result.file, report: { peakDb: result.report.peakDb, rmsDb: result.report.rmsDb, limitedFraction: result.report.limitedFraction, warnings: result.report.warnings } }); }
     print({ directory, tracks: results });
   } else if (command === 'inspect') {
     print(positional[0] ? trackInfo(directory, positional[0], { detail: true }) : getLibrary(directory));

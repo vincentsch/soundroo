@@ -36,6 +36,8 @@ node bin/soundroo.js start
 
 Open the local URL printed in the terminal. The first start prepares **The Open Window**, ten original example pieces across house, downtempo, ambient, synthwave, piano, broken beat, dub, kosmische, mallets and voice electronica. They are complete editable compositions with contrasting sections and endings, rather than ten randomized loops. The studio labels them as examples. They show the instrument palette; your agent creates a personal collection from your own brief.
 
+The usual studio address is `http://127.0.0.1:4317`, so browser preferences and your listening position survive restarts. If that port is occupied, Soundroo prints another local address. Use `--port NUMBER` to choose one.
+
 The repository remains private during development and review, so cloning currently requires access.
 
 ## Words can become instruments

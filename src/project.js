@@ -183,9 +183,9 @@ export function trackInfo(directory, id, { detail = false } = {}) {
     favorite: Boolean(state.favorite), origin: score.origin ?? 'personal', audioUrl: `/api/tracks/${id}/audio`, artworkUrl: `/api/tracks/${id}/artwork`,
     waveform: report.waveform ?? [], revision: current?.id ?? null, versions,
     sections: (score.sections ?? []).map(s => ({ id: s.id, name: s.name, start: s.beat * seconds, end: (s.beat + s.beats) * seconds })),
-    parts: (score.parts ?? []).map((p, i) => ({ id: p.id, name: p.name ?? p.id, instrument: p.instrument, volume: mix.parts?.[p.id]?.volume ?? p.volume ?? 0.7, pan: mix.parts?.[p.id]?.pan ?? p.pan ?? 0, mute: mix.parts?.[p.id]?.mute ?? false, solo: mix.parts?.[p.id]?.solo ?? false, color: p.color ?? ['#ef946b', '#a9bce8', '#b9d0ac', '#b69ccf', '#e2ce87'][i % 5] })),
+    parts: (score.parts ?? []).map((p, i) => ({ id: p.id, name: p.name ?? p.id, instrument: p.instrument, volume: mix.parts?.[p.id]?.volume ?? p.volume ?? 1, pan: mix.parts?.[p.id]?.pan ?? p.pan ?? 0, mute: mix.parts?.[p.id]?.mute ?? false, solo: mix.parts?.[p.id]?.solo ?? false, color: p.color ?? ['#ef946b', '#a9bce8', '#b9d0ac', '#b69ccf', '#e2ce87'][i % 5] })),
   };
-  if (detail) Object.assign(info, { score, mix: { ...mix, master: { volume: score.master?.volume ?? 1, ...mix.master } }, report, feedback: readJson(trackPath(directory, id, 'feedback.json'), []) });
+  if (detail) Object.assign(info, { score, mix: { ...mix, master: { volume: score.master?.volume ?? 0.8, ...mix.master } }, report, feedback: readJson(trackPath(directory, id, 'feedback.json'), []) });
   return info;
 }
 export function getLibrary(directory, jobs = []) {
@@ -194,7 +194,7 @@ export function getLibrary(directory, jobs = []) {
     try { return trackInfo(directory, id); }
     catch (error) { return { id, title: id, description: '', genre: '', mood: '', duration: 0, rendered: false, error: error.message, parts: [], versions: [], waveform: [], sections: [], artworkUrl: `/api/tracks/${id}/artwork` }; }
   });
-  return { collection, tracks, jobs };
+  return { collection, tracks, jobs, directory: libraryPath(directory) };
 }
 
 export async function renderTrack(directory, id, { sampleRate = 44100, stems = false, progress } = {}) {
@@ -211,7 +211,7 @@ export async function renderTrack(directory, id, { sampleRate = 44100, stems = f
     const audio = result.audio;
     const channels = Array.from({ length: audio.numberOfChannels }, (_, i) => audio.getChannelData(i));
     report = { ...result.report, ...analyzeAudio(channels, audio.sampleRate), revision, source: 'editable-score' };
-    report.warnings = [...(result.report?.warnings ?? []), ...technicalWarnings(report)];
+    report.warnings = [...new Set([...(result.report?.warnings ?? []), ...technicalWarnings(report)])];
     if (report.nonFinite || report.clipped) throw new Error('The render failed audio checks: ' + JSON.stringify(report.warnings));
     const temporary = wavFile + '.tmp'; fs.writeFileSync(temporary, Buffer.from(encodeWav(audio)), { mode: 0o600 }); fs.renameSync(temporary, wavFile);
     writeJson(reportFile, report);
