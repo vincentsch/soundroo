@@ -1,0 +1,209 @@
+import { readFile, realpath, stat } from 'node:fs/promises';
+import { resolve, relative, sep } from 'node:path';
+import { setImmediate as yieldTurn } from 'node:timers/promises';
+import { compileScore } from './score.js';
+import { getCatalog } from './catalog.js';
+import { Synth, Voice, Env, WAVES, Reverb, Compressor, BLOCK } from './audio/synth.js';
+import * as instruments from './audio/instruments.js';
+import { mtof } from './audio/dsp.js';
+import { makeRng, hashSeed } from './audio/rng.js';
+import { parseWav, toMono, resample } from './audio/pcm.js';
+import { tapePitch, granularVoice, vocodeVoice, chopVoice } from './audio/voice-effects.js';
+import { analyzeAudio, technicalWarnings } from './audio/analysis.js';
+
+const presets = new Map(getCatalog().instruments.map(p => [p.id, p]));
+const ceiling = Math.pow(10, -1 / 20);
+const audioBuffer = (channels, sampleRate) => ({ length: channels[0].length, sampleRate, numberOfChannels: channels.length, getChannelData(index) { if (!Number.isInteger(index) || !channels[index]) throw new RangeError('Invalid audio channel.'); return channels[index]; } });
+function bounded(value, min, max, label) {
+  if (!Number.isFinite(value) || value < min || value > max) throw new TypeError(`${label} must be a finite number from ${min} to ${max}.`);
+  return value;
+}
+function mixControls(score, mix) {
+  if (!mix || typeof mix !== 'object' || Array.isArray(mix)) throw new TypeError('Mix must be an object.');
+  if (mix.parts !== undefined && (!mix.parts || typeof mix.parts !== 'object' || Array.isArray(mix.parts))) throw new TypeError('mix.parts must be a part controls object.');
+  if (mix.master !== undefined && (!mix.master || typeof mix.master !== 'object' || Array.isArray(mix.master))) throw new TypeError('mix.master must be an object.');
+  for (const id of Object.keys(mix.parts ?? {})) if (!score.parts.some(p => p.id === id)) throw new TypeError(`Unknown mix part: ${id}.`);
+  const parts = score.parts.map(part => {
+    const m = mix.parts?.[part.id] ?? {};
+    if (!m || typeof m !== 'object' || Array.isArray(m)) throw new TypeError(`Mix controls for ${part.id} must be an object.`);
+    for (const key of ['mute', 'solo']) if (m[key] !== undefined && typeof m[key] !== 'boolean') throw new TypeError(`${part.id}.${key} must be boolean.`);
+    return { ...part, volume: bounded(m.volume ?? part.volume, 0, 2, `${part.id}.volume`), pan: bounded(m.pan ?? part.pan, -1, 1, `${part.id}.pan`), mute: m.mute ?? false, solo: m.solo ?? false };
+  });
+  const solo = parts.some(p => p.solo);
+  return { parts: parts.map(p => ({ ...p, audible: !p.mute && (!solo || p.solo) && p.volume > 0 })), volume: bounded(mix.master?.volume ?? score.master.volume, 0, 2, 'master.volume') };
+}
+
+function sustained(synth, lane, t, pitch, velocity, duration, id, tone, rng) {
+  const f = mtof(pitch), attack = tone.attack ?? 0.02, release = tone.release ?? 0.4;
+  const v = new Voice(t, t + Math.max(attack, duration) + release * 7);
+  const envelope = level => new Env(0).set(0, t).lin(level * velocity, t + attack).target(0, t + Math.max(attack, duration), release);
+  if (id === 'fm-lead') v.layer({ wave: WAVES.sine, freq: f, amp: envelope(0.14), fm: { ratio: 2, depth: new Env(f * 2).set(f * 2, t).target(f * 0.18, t, 0.16) } });
+  else if (id === 'organ') {
+    for (const [ratio, level] of [[1, 0.09], [2, 0.045], [3, 0.025], [4, 0.014]]) if (f * ratio < synth.sr * 0.45) v.layer({ wave: WAVES.sine, freq: f * ratio, amp: envelope(level) });
+  } else if (id === 'piano') {
+    for (const [ratio, level] of [[1, 0.17], [2, 0.08], [3, 0.035], [4, 0.02]]) if (f * ratio < synth.sr * 0.45) {
+      v.layer({ wave: WAVES.sine, freq: f * ratio, amp: new Env(0).set(0, t).lin(level * velocity, t + 0.003).target(level * velocity * 0.08, t + 0.003, 0.38 / ratio).target(0, t + duration, release / 3) });
+    }
+  } else if (id === 'noise') v.layer({ wave: WAVES.pink, seed: Math.floor(rng.next() * 0xffffffff), amp: envelope(0.055), freq: 0 });
+  else for (const detune of [-(tone.detune ?? 8), tone.detune ?? 8]) v.layer({ wave: WAVES.saw, freq: f, detune, amp: envelope(0.045) });
+  synth.add(lane, v);
+}
+
+function schedule(synth, lane, note, part, beatSeconds, rng) {
+  const t = note.beat * beatSeconds, duration = note.duration * beatSeconds, velocity = note.velocity;
+  const tone = Object.fromEntries(Object.entries(presets.get(part.instrument).controls).map(([name, spec]) => [name, part.tone[name] ?? spec.default]));
+  const start = synth.pending.length;
+  switch (part.instrument) {
+    case 'electric-piano': instruments.epiano(synth, lane, t, note.pitch, velocity, duration); break;
+    case 'pad': case 'strings': instruments.padVoice(synth, lane, t, note.pitch, velocity, duration, tone); break;
+    case 'pluck': instruments.pluck(synth, lane, t, note.pitch, velocity, { bright: tone.brightness, decay: tone.release }); break;
+    case 'acid-bass': instruments.pluck(synth, lane, t, note.pitch, velocity, { bright: tone.brightness, decay: tone.release, q: 5, level: 0.18 }); break;
+    case 'bass': instruments.bass(synth, lane, t, note.pitch, velocity, duration); break;
+    case 'bell': instruments.bell(synth, lane, t, note.pitch, velocity, { decay: tone.release }); break;
+    case 'marimba': instruments.marimba(synth, lane, t, note.pitch, velocity); break;
+    case 'kick': instruments.kick(synth, lane, t, velocity); break;
+    case 'clap': instruments.clap(synth, lane, t, velocity, rng); break;
+    case 'snare':
+      instruments.clap(synth, lane, t, velocity, rng, { level: 0.14 });
+      instruments.bass(synth, lane, t, 50, velocity, 0.035, { level: 0.075, staccato: true });
+      break;
+    case 'hi-hat': instruments.hat(synth, lane, t, velocity, rng); break;
+    case 'shaker': instruments.shaker(synth, lane, t, velocity, rng); break;
+    default: sustained(synth, lane, t, note.pitch, velocity, duration, part.instrument, tone, rng);
+  }
+  // The primitives' acoustic partials assume 44.1 kHz; omit inaudible partials
+  // at preview sample rates rather than feeding an oscillator past Nyquist.
+  for (const voice of synth.pending.slice(start)) voice.layers = voice.layers.filter(layer => layer.freqEnv || layer.wave === WAVES.noise || layer.wave === WAVES.pink || layer.freq * Math.pow(2, Math.abs(layer.detune ?? 0) / 1200) < synth.sr * 0.45);
+}
+
+async function loadSample(sample, sampleRate, bpm, projectDir) {
+  let path;
+  if (sample.asset.startsWith('builtin:')) path = new URL(`../assets/voices/${sample.asset.slice(8)}.wav`, import.meta.url);
+  else {
+    if (!projectDir) throw new Error('A projectDir is required to load project assets.');
+    const root = await realpath(resolve(projectDir, 'assets'));
+    path = await realpath(resolve(projectDir, sample.asset));
+    const local = relative(root, path);
+    if (local.startsWith(`..${sep}`) || local === '..' || local.startsWith(sep)) throw new Error('Sample asset must stay within the project assets directory.');
+  }
+  const info = await stat(path);
+  if (info.size > 32 * 1024 * 1024) throw new Error('Sample WAVs must be at most 32 MB.');
+  const bytes = await readFile(path);
+  const wav = parseWav(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength));
+  if (!Number.isFinite(wav.sampleRate) || wav.sampleRate < 8000 || wav.sampleRate > 192000 || !wav.channels.length || wav.channels.length > 8 || wav.channels[0].length > wav.sampleRate * 60) throw new Error('Sample WAVs need 1–8 channels, 8–192 kHz and at most 60 seconds.');
+  let data = resample(toMono(wav.channels), wav.sampleRate, sampleRate);
+  if (data.some(v => !Number.isFinite(v))) throw new Error('Sample WAV contains non-finite audio.');
+  switch (sample.effect) {
+    case 'tape': data = tapePitch(data, sample.semitones); break;
+    case 'granular': data = granularVoice(data, sampleRate, sample); break;
+    case 'vocoder': data = vocodeVoice(data, sampleRate, { pitch: sample.pitch }); break;
+    case 'chop': data = chopVoice(data, sampleRate, { bpm, semitones: sample.semitones, pattern: sample.pattern }); break;
+  }
+  return data;
+}
+
+/** Render a deterministic stereo buffer. from/to are seconds on the score timeline.
+ * Progress receives {phase,progress,fraction,seconds,duration}; return false or abort signal
+ * to cancel. Stems are dry post-part-mix buses, before shared master processing.
+ */
+export async function renderScore(score, { sampleRate = 44100, mix = {}, projectDir, stems = false, from = 0, to, progress, signal } = {}) {
+  const expandedScore = compileScore(score);
+  bounded(sampleRate, 8000, 96000, 'sampleRate');
+  if (!Number.isInteger(sampleRate)) throw new TypeError('sampleRate must be an integer.');
+  const beatSeconds = 60 / expandedScore.bpm, duration = expandedScore.beats * beatSeconds;
+  bounded(from, 0, duration, 'from');
+  bounded(to ?? duration, 0, duration, 'to');
+  const end = to ?? duration;
+  if (end <= from) throw new RangeError('to must be after from.');
+  if (progress !== undefined && typeof progress !== 'function') throw new TypeError('progress must be a callback.');
+  const check = (phase, seconds) => {
+    if (signal?.aborted || progress?.({ phase, progress: seconds / end, fraction: seconds / end, seconds, duration: end }) === false) {
+      const error = new Error('Render cancelled.'); error.name = 'AbortError'; throw error;
+    }
+  };
+  check('preparing', 0);
+  const controls = mixControls(expandedScore, mix);
+  const firstFrame = Math.round(from * sampleRate), lastFrame = Math.round(end * sampleRate);
+  if (lastFrame <= firstFrame) throw new RangeError('Render range must contain at least one sample.');
+  const frames = lastFrame - firstFrame;
+  const channels = [new Float32Array(frames), new Float32Array(frames)];
+  const stemBuffers = stems ? Object.fromEntries(controls.parts.map(p => [p.id, [new Float32Array(frames), new Float32Array(frames)]])) : null;
+  const buses = [];
+  for (const part of controls.parts) {
+    if (!part.audible || !part.notes.length) continue;
+    const synth = new Synth(sampleRate, lastFrame);
+    const tone = presets.get(part.instrument).controls;
+    const cutoff = part.tone.brightness ?? tone.brightness?.default;
+    const filter = part.instrument === 'hi-hat' || part.instrument === 'shaker' ? { type: 'highpass', freq: 6500 } : part.instrument === 'clap' || part.instrument === 'snare' ? { type: 'bandpass', freq: 1800, q: 0.7 } : cutoff ? { type: 'lowpass', freq: cutoff } : null;
+    const lane = synth.lane({ gain: part.volume, pan: part.pan, filter });
+    const rng = makeRng(hashSeed(expandedScore.seed, part.id));
+    let sample, events;
+    if (part.instrument === 'sample') {
+      sample = await loadSample(part.sample, sampleRate, expandedScore.bpm, projectDir);
+      events = part.notes.filter(n => n.beat * beatSeconds < end).map(n => ({ start: Math.round(n.beat * beatSeconds * sampleRate), length: Math.min(sample.length, Math.round(n.duration * beatSeconds * sampleRate)), velocity: n.velocity }));
+    } else for (const note of part.notes) if (note.beat * beatSeconds < end) schedule(synth, lane, note, part, beatSeconds, rng);
+    buses.push({ part, synth, sample, events, next: 0, active: [], left: new Float32Array(BLOCK), right: new Float32Array(BLOCK) });
+    check('preparing', 0);
+  }
+  const reverb = expandedScore.master.reverb > 0 ? new Reverb(sampleRate, { room: 0.75 }) : null;
+  const compressor = new Compressor(sampleRate, { threshold: -12, ratio: 2, knee: 6, makeupDb: 0 });
+  const left = new Float32Array(BLOCK), right = new Float32Array(BLOCK), send = new Float32Array(BLOCK);
+  let limited = 0;
+  for (let offset = 0; offset < lastFrame; offset += BLOCK) {
+    const count = Math.min(BLOCK, lastFrame - offset);
+    left.fill(0); right.fill(0); send.fill(0);
+    for (const bus of buses) {
+      bus.left.fill(0); bus.right.fill(0);
+      bus.synth.renderBlock(offset, count, bus.left, bus.right);
+      if (bus.sample) {
+        while (bus.next < bus.events.length && bus.events[bus.next].start < offset + count) bus.active.push(bus.events[bus.next++]);
+        const angle = (bus.part.pan + 1) * Math.PI / 4;
+        const gl = Math.cos(angle) * Math.SQRT2 * bus.part.volume, gr = Math.sin(angle) * Math.SQRT2 * bus.part.volume;
+        for (const event of bus.active) {
+          const start = Math.max(offset, event.start), finish = Math.min(offset + count, event.start + event.length);
+          const fade = Math.max(1, Math.min(Math.round(sampleRate * 0.008), event.length / 2));
+          for (let frame = start; frame < finish; frame++) {
+            const position = frame - event.start;
+            const envelope = Math.min(1, position / fade, (event.length - 1 - position) / fade);
+            const value = bus.sample[position] * event.velocity * envelope;
+            bus.left[frame - offset] += value * gl; bus.right[frame - offset] += value * gr;
+          }
+        }
+        bus.active = bus.active.filter(e => e.start + e.length > offset + count);
+      }
+      const wet = presets.get(bus.part.instrument).drums ? 0.12 : bus.part.instrument === 'bass' || bus.part.instrument === 'acid-bass' ? 0.08 : 0.5;
+      for (let i = 0; i < count; i++) {
+        left[i] += bus.left[i]; right[i] += bus.right[i];
+        send[i] += (bus.left[i] + bus.right[i]) * 0.5 * wet;
+        const frame = offset + i - firstFrame;
+        if (stemBuffers && frame >= 0) {
+          stemBuffers[bus.part.id][0][frame] = bus.left[i]; stemBuffers[bus.part.id][1][frame] = bus.right[i];
+        }
+      }
+    }
+    if (reverb) reverb.process(send, count, left, right, expandedScore.master.reverb);
+    compressor.process(left, right, count);
+    for (let i = 0; i < count; i++) {
+      const frame = offset + i - firstFrame;
+      if (frame < 0) continue;
+      // File edges follow the complete musical timeline, not an excerpt boundary.
+      const time = (offset + i) / sampleRate;
+      const fade = Math.max(0, Math.min(1, time / 0.004, (duration - time - 1 / sampleRate) / 0.04));
+      for (let ch = 0; ch < 2; ch++) {
+        const value = (ch ? right[i] : left[i]) * controls.volume * fade;
+        if (Math.abs(value) > ceiling) limited++;
+        channels[ch][frame] = Math.max(-ceiling, Math.min(ceiling, value));
+      }
+    }
+    if (offset % (BLOCK * 64) === 0) { check('rendering', Math.min(end, (offset + count) / sampleRate)); await yieldTurn(); }
+  }
+  const report = analyzeAudio(channels, sampleRate);
+  report.from = from;
+  report.to = end;
+  report.sections = expandedScore.sections.map(s => ({ ...s, time: s.beat * beatSeconds, duration: s.beats * beatSeconds }));
+  report.warnings = technicalWarnings(report);
+  report.limitedFraction = limited / (frames * 2);
+  report.stemDescription = 'Dry stereo buses after part volume, pan and mute/solo, before shared master reverb, compression, volume and safety limiting. They do not sum to the mastered render.';
+  check('complete', end);
+  return { audio: audioBuffer(channels, sampleRate), report, parts: expandedScore.parts.map(({ id, name, color }) => ({ id, name, color })), ...(stemBuffers ? { stems: Object.fromEntries(Object.entries(stemBuffers).map(([id, data]) => [id, audioBuffer(data, sampleRate)])) } : {}), expandedScore };
+}
