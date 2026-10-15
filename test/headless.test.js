@@ -63,7 +63,7 @@ test('the engine hash covers rendering, validation and identity source, independ
     assert.equal(original, JSON.stringify(soundroo.engineManifest()));
     for (const file of ['src/server.js', 'src/project.js', 'src/version.js']) fs.appendFileSync(path.join(copy, file), '\n// network and studio changes\n');
     const render = path.join(copy, 'src/render.js');
-    fs.writeFileSync(render, fs.readFileSync(render, 'utf8').replace(/\n/g, '\r\n'));
+    fs.writeFileSync(render, fs.readFileSync(render, 'utf8').replace(/\r?\n/g, '\r\n'));
     assert.equal(hash(), original);
     fs.appendFileSync(render, '// engine change\r\n');
     assert.notEqual(hash(), original);
