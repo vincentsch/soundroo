@@ -144,7 +144,7 @@ export function deleteFeedback(directory, id, feedbackId) {
   writeJson(trackPath(directory, id, 'feedback.json'), next); return { deleted: true };
 }
 
-export function saveRequest(directory, { brief, count = 10 }) {
+export function saveRequest(directory, { brief, count = 1 }) {
   if (typeof brief !== 'string' || !brief.trim() || brief.length > 8000) throw new Error('Describe the music in 1 to 8,000 characters.');
   if (!Number.isInteger(count) || count < 1 || count > 30) throw new Error('Choose between 1 and 30 tracks.');
   const id = new Date().toISOString().replace(/[:.]/g, '-') + '-' + crypto.randomBytes(3).toString('hex');
