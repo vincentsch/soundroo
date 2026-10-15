@@ -56,7 +56,17 @@ Sharing again updates the same collection: changed tracks get a new version at t
 
 ## Your artist page
 
-The first share creates a guest artist page and stores a key that can only publish. The answer includes a **claim link**: open it, sign in with Google, GitHub or an email link, and the music moves to your own account and can be listed publicly. Keep the claim link private, because whoever opens it can claim the page. It works once and expires after 30 days; `node bin/soundroo.js claim-link` asks for a fresh one.
+The first share creates an artist page without an owner, with a generated name, and stores a key that can only publish. Every later share from this computer goes to the same page. Its music is unlisted: anyone with a link can listen, but it is not listed on soundroo.com. A page without an owner holds up to 10 tracks; new versions of those tracks are always fine. Beyond that, sharing stops with `claim_required`.
+
+To keep the page, confirm an email address:
+
+```bash
+node bin/soundroo.js claim --email you@example.com
+```
+
+soundroo.com emails a link that works once and expires after an hour. Pressing its button signs the person in: a new address creates an account that takes over the artist page, and an existing account receives the music. Either way the links stay the same, the music can be listed publicly and the 10-track limit no longer applies. Throwaway email services are refused. `--dry-run` shows the request without sending it.
+
+The first share's answer also includes a **claim link**. It does the same thing in a browser: open it and sign in with Google, GitHub or an email link. Keep it private, because whoever opens it can claim the page. It works once and expires after 30 days; `node bin/soundroo.js claim-link` asks for a fresh one.
 
 Editing or deleting shared tracks from the command line needs an account key. After claiming, connect this computer:
 
@@ -96,7 +106,7 @@ Change the music before sharing it: an unchanged copy is refused. A changed remi
 
 ## For scripts and agents
 
-Every network command accepts `--json` and prints one JSON document on standard output. `share`, `share status --refresh`, `import`, `login`, `logout`, `whoami` and `claim-link` accept `--dry-run` for a preview that contacts nothing and writes nothing. A failure prints `{"error": "…", "code": "…", "exitCode": n}` with `issues` (path and message) and a `hint` when useful, and `claimUrl` when a saved claim link is the way forward; give it to the person privately. Exit codes:
+Every network command accepts `--json` and prints one JSON document on standard output. `share`, `share status --refresh`, `import`, `login`, `logout`, `whoami`, `claim` and `claim-link` accept `--dry-run` for a preview that contacts nothing and writes nothing. A failure prints `{"error": "…", "code": "…", "exitCode": n}` with `issues` (path and message) and a `hint` when useful, and `claimUrl` when a saved claim link is the way forward; give it to the person privately. Exit codes:
 
 | Code | Meaning |
 | --- | --- |
@@ -104,7 +114,7 @@ Every network command accepts `--json` and prints one JSON document on standard 
 | 1 | Invalid request or music that cannot be shared yet (`render_required`, `rights_not_accepted`, `local_audio`, `validation_failed`, …) |
 | 2 | The service or network failed, or soundroo-cloud could not be used |
 | 3 | No key, or the key was not accepted (`key_missing`, `auth_invalid`, `auth_required`) |
-| 4 | The key is not allowed to do that (`artist_mismatch`, `forbidden`) |
+| 4 | The key is not allowed to do that (`artist_mismatch`, `forbidden`, `claim_required` when a page without an owner is full) |
 | 5 | Not found |
 | 6 | The service asked to slow down |
 

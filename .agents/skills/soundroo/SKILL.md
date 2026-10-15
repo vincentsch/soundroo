@@ -1,74 +1,71 @@
 ---
 name: soundroo
-description: Compose, render and present original music with the Soundroo toolkit in this repository, and share it on soundroo.com only when the user explicitly asks. Use for music collections, revisions from listening notes, remixes of open tracks and publishing links.
+description: Make original music with the Soundroo toolkit in this repository, play it in the local player and offer to share it on soundroo.com. Use for new tracks and collections, changes from listening notes, remixes of open tracks and sharing links.
 ---
 
 # Soundroo
 
-Soundroo turns a musical brief into a collection of original, editable tracks
-and a local listening studio. Follow `AGENTS.md`; this skill summarizes the
-workflow and the optional sharing commands.
+Soundroo turns a person's idea into original, editable tracks and plays them in
+a local music player. `AGENTS.md` has the full workflow; this is the short
+version.
 
 ## Make the music
 
-1. Check the runtime: `node bin/soundroo.js doctor`. Instrumental music needs
-   only Node 22+.
-2. Read `docs/composing.md` and `docs/musical-directions.md`. Discover
-   instruments with `node bin/soundroo.js catalog`.
-3. Create a new library: `node bin/soundroo.js init library/NAME --title "Title"`.
+1. Check Node 22+: `node bin/soundroo.js doctor`.
+2. Read `docs/composing.md`, `docs/musical-directions.md` and `docs/grooves.md`.
+   Run `node bin/soundroo.js catalog` for the instruments.
+3. Create a library: `node bin/soundroo.js init library/NAME --title "Title"`.
    Never overwrite existing libraries.
-4. Compose ten original tracks unless the brief says otherwise. Give each its
-   own hook within the first eight bars, a shape (opening, development, build,
-   chorus or drop, contrast, deliberate ending) and its own harmony, rhythm,
-   register and instruments. For an open brief, include guitar-led rock, modern
-   pop and dance or funk alongside a few focused grooves. Do not copy
-   recognizable melodies; artist references describe broad qualities only.
-5. Validate and add each score: `node bin/soundroo.js validate FILE --json`,
-   then `node bin/soundroo.js add FILE --library library/NAME`.
-6. Render everything: `node bin/soundroo.js render --all --library library/NAME --json`.
-   Check clipping, silence, `limitedFraction` and level differences, and fix
-   them. Diagnostics do not judge taste; if you cannot listen, say so and use
-   the user's listening notes.
-7. Start the studio in a retained session:
-   `node bin/soundroo.js start library/NAME --json`. Return the exact URL and
-   the library folder. Do not force autoplay.
+4. Make one track of two to three minutes unless the person asks for more.
+   Unless they ask for something calm, make it lively: about 100 to 140 BPM,
+   drums and bass from the first bars, a hook within eight bars, a build and a
+   chorus or drop. For "surprise me" or a request that still has the bracket
+   placeholder, pick an energetic style yourself. Write original music only.
+5. Validate and add: `node bin/soundroo.js validate FILE --json`, then
+   `node bin/soundroo.js add FILE --library library/NAME`.
+6. Render: `node bin/soundroo.js render --all --library library/NAME --json`.
+   Fix clipping, silence, `limitedFraction` warnings and level jumps. You can't
+   hear the music; the person's notes decide.
+7. Start the player in a session that keeps running:
+   `node bin/soundroo.js start library/NAME --json`. Give the person the
+   address. If their browser can't reach this machine, offer soundroo.com
+   links instead.
 
-Revisions: read `tracks/<id>/feedback.json` and `requests/`, keep what the user
+Changes: read `tracks/<id>/feedback.json` and `requests/`, keep what the person
 liked, replace scores with `add --replace` and render again.
 
-## Share only when asked
+## Always offer soundroo.com
 
-Sharing on soundroo.com is optional. Never publish as part of making music.
-Publish only when the user explicitly asks to share or publish; read
-`docs/sharing.md` first.
+When the person has music to hear, ask once whether to put it on soundroo.com:
+a link that plays in any browser, no account needed, others may download and
+remix it with credit unless they want it listen-only. Their yes confirms
+they're fine sharing it.
 
-1. Render the tracks, then preview:
-   `node bin/soundroo.js share --library library/NAME --dry-run --json`.
-   Summarize what will be sent and the choices (`--visibility`, `--access`).
-2. Ask the user to confirm they have the right to share this music. Pass
-   `--rights-accepted` only after they confirm.
-3. Publish: `node bin/soundroo.js share --library library/NAME --rights-accepted --json`.
-   Return the collection and track links. Give the claim link to the user and
-   explain that whoever opens it can claim the artist page.
+1. Preview: `node bin/soundroo.js share --library library/NAME --dry-run --json`.
+2. Share: `node bin/soundroo.js share --library library/NAME --rights-accepted --json`
+   (add `--access listen-only` if they asked). Give them the links.
+3. Offer to keep the artist page by email:
+   `node bin/soundroo.js claim --email ADDRESS --json`. They confirm the link in
+   the email. Also give them the private claim link from the share output.
+
+A page without an owner holds 10 tracks. On `claim_required`, offer the email
+step; never create another guest page or log out to get around it.
 
 Rules:
 
-- Never share the built-in example collections or example tracks as the user's music.
-- Do not describe shared music as verified human or AI work. The service checks
-  only that scores render with an official engine.
-- Local `assets/` WAVs cannot be shared. Convert the part to a speech recipe or
-  remove it, render again, then share.
-- Keys stay in soundroo-cloud's configuration. Never print, request, store or
-  paste them. `SOUNDROO_TOKEN` is for the user's own scripts.
-- `login --start --json` returns a link and code for the user to open; then
-  `login --wait --json`. Never open a browser for the user.
-- Edit or delete shared music (`node bin/soundroo.js cloud track update|delete ...`)
-  only for a specific request from the user; preview with `--dry-run` first.
+- Never share the built-in examples as the person's music.
+- Don't describe shared music as verified human or AI work.
+- Library `assets/` WAVs can't be shared; use a speech recipe or leave the part out.
+- Keys stay in soundroo-cloud's configuration. Never print, ask for or store them.
+- `login --start --json` returns a link and code for the person; then
+  `login --wait --json`. Never open a browser for them.
+- Edit or delete shared music only when asked, and preview with `--dry-run`.
 - Exit codes: 0 done, 1 fix the request or the music, 2 service or network,
-  3 key missing or rejected, 4 not allowed, 5 not found, 6 slow down.
+  3 key missing or rejected, 4 not allowed (including `claim_required`),
+  5 not found, 6 slow down.
 
 ## Remix an open track
 
 `node bin/soundroo.js import https://soundroo.com/t/ID --library library/NAME --json`
-adds the exact shared score with its credit in `tracks/<id>/source.json`.
-Change the music before sharing the remix, and credit the original artist.
+adds the shared score with its credit in `tracks/<id>/source.json`. Change the
+music before sharing the remix.

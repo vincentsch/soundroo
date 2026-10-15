@@ -1,58 +1,142 @@
-# Soundroo
+# Soundroo for AI agents
 
-Soundroo is a music creation toolkit for coding agents with a finished local listening studio. Original standalone music and artistic collections are the primary use. Games, videos and app sounds are additional uses, never the default positioning.
+This file tells you, the AI agent, how to make music with Soundroo. The person gives you an idea, maybe only a few words. You compose the music as an editable score. Soundroo renders it into audio on this computer and opens a small music player in the browser, where the person listens.
 
-## Product contract
+Soundroo needs Node.js 22 or newer and nothing else: no account, no API key, no music software, no model download. Speech is optional.
 
-- Give a shell-capable coding agent this repository and a musical brief. The agent makes a collection of ten original compositions, renders and checks them, then starts the local studio and returns its URL.
-- The user listens, plays favorites, compares revisions and exports music. Mixing and deeper controls are optional. The main experience is a beautiful music library with actual playable tracks.
-- Core rendering is local JavaScript on Node 22+, without accounts, API keys, Python, ffmpeg or model weights. Speech synthesis is optional; plain instrumental playback must work independently.
-- Keep every composition editable and keep its source. Never present fixed starter compositions as music personalized for a user. A built-in example collection is clearly labeled.
-- Compose original motifs and develop them. Do not recreate recognizable copyrighted melodies. Named artist references describe broad musical qualities, not an instruction to copy a tune.
-- Voice experiments process speech as spoken word, rhythmic chops, textures or vocoder effects. Do not claim natural singing from a speech model.
+The documentation for people is at https://soundroo.com/docs.
 
-## Make a collection
+## Before you start
 
-When someone gives you this repository, create their music and deliver the studio. Make ten original tracks by default unless their brief specifies another count. Choose a coherent creative direction from the brief; if it is open-ended, surprise them with a varied artistic collection. Do not ask them to learn a score format, choose engineering options or install a music application.
+Maybe the person pasted the prompt from soundroo.com or the README, and you are not in a Soundroo folder yet. Then clone it into the current folder first. If they named another place, use that.
 
-1. Check Node 22+ with `node bin/soundroo.js doctor`. Instrumental music, the studio and existing speech effects need no npm installation. Read `docs/composing.md` (including compact version 2 patterns and optional spoken-text recipes), discover instruments with `node bin/soundroo.js catalog`, and study the varied arrangements in `examples/variety.js` or the softer `examples/collection.js` for structure rather than copying their melodies.
-2. Create a new personal library with `node bin/soundroo.js init library/my-music --title "Collection name"`. Keep existing libraries intact. The default `start` collection is a clearly labeled demonstration; it is not personalized music.
-3. Write a composition script and editable JSON scores inside that library. Use the helpers in `src/compose.js`: `note`, `chordPitches`, `chordNotes`, `pattern`, `transformPattern`, `arrangePattern`, `arpeggiate`, and `makeSections`. The score contract and a complete runnable example are in `docs/composing.md`.
-4. Give each piece an original hook and a musical shape: a quick opening, verse/development, prechorus/build, chorus/drop, a contrast and a deliberate ending. Let the hook arrive within the first eight bars. Change harmony, rhythm, register, instrumentation and dynamics between tracks. A new seed or tempo on the same four-bar loop is not a collection. For an open-ended brief, include guitar-led rock, modern pop and rhythm-led dance/funk alongside a few focused work grooves. Do not default a whole collection to soft piano, mallets and pads. Use the guitar/bass and rock drum presets for rock, with riffs, backbeats, fills and contrasting choruses. Treat focus music as one intentional mode, not the default for all music. See docs/musical-directions.md.
-5. Save each score and run `node bin/soundroo.js validate path/to/score.json --json`, then `node bin/soundroo.js add path/to/score.json --library library/my-music`. Use `--replace` for a revision; previous rendered versions remain available. Rendering and diagnostics do not establish musical taste. If you cannot actually listen, say so when asked and use the user's listening notes for musical decisions.
-6. Render all tracks with `node bin/soundroo.js render --all --library library/my-music --json`. Check the reports for invalid samples, clipping, silence and extreme level differences. Inspect `limitedFraction` and its warning: lower excessive levels instead of accepting a flattened mix. Inspect the arrangement and endings. Preserve the melody and unaffected sections when a user requests a targeted change.
-7. Start `node bin/soundroo.js start library/my-music --json` in a retained session. Return the exact local URL printed by the command and the library folder. Keep the server running while the user listens. Do not force autoplay. The studio is their listening library, not a setup wizard.
+```bash
+git clone https://github.com/vincentsch/soundroo.git
+cd soundroo
+node bin/soundroo.js doctor
+```
 
-## Listening notes and new briefs
+`doctor` checks Node. If Node is missing or older than 22, tell the person and help them install Node 22 (for example from https://nodejs.org or with nvm). Nothing else needs installing.
 
-The studio saves notes in `tracks/<id>/feedback.json` and musical requests in `requests/`. Read them on the next user request. A saved brief does not start a model automatically. Use `node bin/soundroo.js requests --library PATH --json`, process pending requests, and mark their JSON status `done` with the resulting track IDs after successful rendering. Preserve the original request and timestamps. Favorites, mix state and voice files stay in the user's library.
+If you can't run commands on a real computer at all (for example in a chat app), stop and send the person to https://soundroo.com/connect. That page explains the Soundroo connector for ChatGPT and Claude.
 
-Mix changes in the studio render a new version. If you edit notes, preserve `mix.json` unless the user asks for a new mix. The user's player volume is a listening preference; it does not change exports. WAV downloads contain the rendered mix. MIDI contains note data and instrument mappings; sampled speech/noise and the synthesized timbre are not preserved in MIDI. Stems omit shared master processing and need not sum to the mastered WAV.
+## What to make
 
-## Sharing, only when asked
+Read the person's words and decide the normal things yourself: style, tempo, instruments, length, title. Ask only when the request contradicts itself or you can't go on without an answer.
 
-Sharing on soundroo.com is optional and never part of making a collection. Publish only when the user explicitly asks you to share or publish. Read `docs/sharing.md` first.
+- **One track first.** Unless they ask for more ("an album", "five tracks", "a collection"), make one track of about two to three minutes. A first track they can hear in a few minutes beats ten tracks they wait for. After they've listened, offer more.
+- **"Surprise me", or the brackets are still there.** If the request still contains the placeholder in square brackets, or says "surprise me" or nothing specific, pick a lively style yourself. Choose something with energy, like funk, house, rock, synthwave, disco or drum and bass.
+- **Lively by default.** Unless they ask for something calm, the music is rhythm-led and fun: about 100 to 140 BPM, drums and bass from the first bars, a hook within the first eight bars, chords in rhythm, a build and a chorus or drop. [docs/musical-directions.md](docs/musical-directions.md) explains this, and [docs/grooves.md](docs/grooves.md) has drum and bass patterns for each style. Calm, ambient and focus music are fine when someone asks for them. Don't fall back to soft piano, slow pads and long quiet intros.
+- **A collection.** When they ask for several tracks, give each its own hook, groove, key, tempo and instruments. A new seed or tempo on the same loop is not a new track. For an open request, mix styles: rock, pop, dance, funk, and maybe one focused groove.
+- **Original music only.** Write new motifs and develop them. Never recreate a melody someone would recognize. An artist name in a request describes a broad sound, not a tune to copy.
+- **No singing.** Soundroo is instrumental, with optional spoken words as rhythmic chops, textures or a vocoder hook. If someone wants vocals, say that Soundroo speaks words but can't sing, and offer a spoken or vocoder part.
 
-1. Render every track to share, then preview with `node bin/soundroo.js share --library PATH --dry-run --json`. Tell the user what will be sent and its choices (`--visibility`, `--access`).
-2. Ask the user to confirm they have the right to share this music. Pass `--rights-accepted` only after they confirm; never assume it.
-3. Run `node bin/soundroo.js share --library PATH --rights-accepted --json` and return the collection and track links. Give the claim link to the user privately and say that whoever opens it can claim the artist page.
+## Making a track, step by step
 
-Never share the built-in example collections or examples as the user's music, and never present tracks as verified human or AI work: the service only checks that scores render with an official engine. Local `assets/` WAVs cannot be shared; convert them to speech recipes or leave the part out. Keys stay in soundroo-cloud's own configuration; never print, request or store them. Login prints a link for the user to open; never open a browser for them. Do not delete or edit shared music unless the user asks for that specific change.
+1. **Learn the format.** Read [docs/composing.md](docs/composing.md) and [docs/musical-directions.md](docs/musical-directions.md). Run `node bin/soundroo.js catalog` for the instruments and their settings. [examples/streetlight-funk.json](examples/streetlight-funk.json) is a complete lively track; study its shape, then write your own music.
 
-## Headless and compact composition
+2. **Create a library.** One library per collection, under `library/`:
 
-`src/headless.js` exposes the same validation, rendering, MIDI and sleeve functions as the CLI. See `docs/headless.md`. Its engine hash identifies rendering/validation/identity source, independently of network/UI code. Version 2 scores accept compact `steps` and `line` strings in patterns; they compile to ordinary notes. `examples/paper-satellites.json` demonstrates a complete compact piece. Existing version 1 scores remain supported.
+   ```bash
+   node bin/soundroo.js init library/<name> --title "Collection title"
+   ```
 
-Speech recipes use `sample.speech: {text, voice}` instead of a local WAV asset. The optional local Kokoro runtime speaks each recipe once and caches it. Recipe output is processed speech, not natural singing. Core instrumental creation remains Node-only.
+   Never overwrite or delete an existing library. The built-in example collection (Turn It Up) is a demonstration, not the person's music.
 
-## Voice and sound art
+3. **Write the score.** Use version 2 scores with compact `steps` and `line` patterns placed with `clips`, or write a small script in the library that builds the score with the helpers in `src/compose.js`. Plan the sections and where the energy goes before writing notes. Keep the score and any script in the library so the music stays editable.
 
-`assets/voices/` contains short spoken phrases for experiments. A sample part can use `builtin:made-of-light` and the other phrases listed by `catalog`, or a WAV under the library's `assets/` folder. Effects are `dry`, `tape`, `granular`, `vocoder`, and `chop`.
+4. **Check and add it.**
 
-For the user's own words, install the optional local runtime from the Soundroo folder with `npm install --no-save --package-lock=false kokoro-js@1.2.1 @huggingface/transformers@3.8.1`, then run `node bin/soundroo.js voice create "Their words" --voice af_heart --out library/my-music/assets/phrase.wav`. The first use downloads a local speech model. Speech creation is optional; do not hold an instrumental collection on that download. Use speech as rhythm, texture, spoken word or a vocoder hook. Never promise natural singing from Kokoro.
+   ```bash
+   node bin/soundroo.js validate library/<name>/<track>.json --json
+   node bin/soundroo.js add library/<name>/<track>.json --library library/<name>
+   ```
 
-`node bin/soundroo.js voice process input.wav --effect vocoder --pitch 60 --out output.wav` works without the speech model. Tape pitch also changes duration. Granular processing is an audible texture, not a transparent studio pitch shifter. Use voice phrases sparingly and develop the music around them.
+   Use `--replace` to revise a track. Earlier rendered versions stay available.
+
+5. **Render it.**
+
+   ```bash
+   node bin/soundroo.js render --all --library library/<name> --json
+   ```
+
+   Read the report. Fix clipping, silence and big level jumps. If `limitedFraction` has a warning, lower the levels instead of accepting a squashed mix. Check that the track has a real ending. These checks find technical problems; they can't tell you whether it sounds good. You can't hear the music, so don't claim it sounds great.
+
+6. **Open the player.** Start the studio in a session that keeps running, and don't stop it while the person listens:
+
+   ```bash
+   node bin/soundroo.js start library/<name> --json
+   ```
+
+   It prints a local address, usually `http://127.0.0.1:4317`. Don't force autoplay.
+
+7. **Tell the person.** Give them the address, the track title and one or two plain sentences about what you made (style, tempo, what to listen for). Say they can leave notes in the player or tell you what to change. Then ask the sharing question below in the same message.
+
+## Always offer soundroo.com
+
+When the person has music to listen to, ask once whether to put it on soundroo.com. Use your own words, along these lines:
+
+> Want me to put it on soundroo.com too? You'd get a link that plays in any browser, to send to friends. No account needed. Anyone with the link can listen, and others can download and remix it with credit unless you'd like it listen-only. Only say yes if you're fine sharing it.
+
+Their yes also confirms they're fine sharing the music. Don't ask twice, and don't push if they say no.
+
+When they say yes:
+
+1. Render everything you share, then preview with `node bin/soundroo.js share --library library/<name> --dry-run --json`.
+2. Share: `node bin/soundroo.js share --library library/<name> --rights-accepted --json`. Add `--access listen-only` if they wanted that. The first share downloads soundroo-cloud, a small helper that does the network part, and creates an artist page without an owner. Its music is unlisted: it plays for anyone with the link.
+3. Give them the collection link and the track links. The tracks play once soundroo.com has rendered them, usually within a minute or two.
+4. Offer to keep the page: "If you give me your email address, I'll send you a link. Confirm it and the artist page is yours, so you can list your music on Soundroo and share more than 10 tracks." If they give one, run `node bin/soundroo.js claim --email <address> --json` and tell them to open the email and press the button. It works once and expires in an hour.
+5. The share output also has a private claim link. Give it to the person and say that whoever opens it can take over the artist page, so they should keep it to themselves.
+
+An artist page without an owner holds up to 10 tracks. If sharing fails with `claim_required`, explain that and offer the email step. Never create another guest page or log out to get around it. Throwaway email addresses (Mailinator and the like) are refused.
+
+Never share the built-in example collections or present them as the person's music. Never present music as verified human or AI work; soundroo.com only checks that a score renders with an official engine.
+
+## When the person can't open the player
+
+If you run somewhere the person's browser can't reach, like a cloud sandbox, a remote container or a server over SSH, a `127.0.0.1` address is useless to them. Say so, and offer to put the music on soundroo.com instead (same question as above), or point them to the rendered WAV file in `library/<name>/tracks/<id>/renders/` if they can download files from you. If your environment forwards ports, give the forwarded address.
+
+## Listening notes and revisions
+
+The player saves notes in `tracks/<id>/feedback.json` and new requests in `requests/`. Read them when the person comes back. `node bin/soundroo.js requests --library library/<name> --json` lists open requests. After you finish one, set its status to `done` with the resulting track ids. Keep the original request and its timestamps.
+
+When they ask for a change, change only what they asked for and keep what they liked: the melody, the groove, the sections that work. Render again; the earlier version stays in the player for comparison. Keep their `mix.json` unless they ask for a new mix. After a change to shared music, ask whether to share the update; sharing again updates the same links.
+
+## More music
+
+After the first track, offer more: more tracks in the same style, a contrasting one, or a whole collection. Add new tracks to the same library so they share a player and a collection page.
+
+## Words and voices
+
+A `sample` part plays short spoken phrases. Built-in phrases like `builtin:made-of-light` work right away (see `catalog`). For the person's own words, a score can name them in a speech recipe, `"sample": { "speech": { "text": "...", "voice": "af_heart" }, "effect": "vocoder", "pitch": 60 }`. That needs the optional local voice model, installed once from the Soundroo folder:
+
+```bash
+npm install --no-save --package-lock=false kokoro-js@1.2.1 @huggingface/transformers@3.8.1
+```
+
+The first spoken render downloads the model. Don't make an instrumental track wait for it. Effects are `dry`, `tape`, `granular`, `vocoder` and `chop`. Use speech as rhythm, texture or a robot hook. Never promise singing.
+
+A part can't share a WAV from the library's `assets/` folder on soundroo.com. Use a speech recipe instead, or leave that part out of the shared version.
+
+## Remixing an open track
+
+```bash
+node bin/soundroo.js import https://soundroo.com/t/<id> --library library/<name> --json
+```
+
+This adds the exact shared score with its credit in `tracks/<id>/source.json`. Change the music before sharing the remix; an unchanged copy is refused. A shared remix links back to the original.
+
+## Accounts and keys
+
+- Keys live in soundroo-cloud's own configuration, never in a library. Never print, ask for or store them.
+- `node bin/soundroo.js login --start --json` returns a link and a code for the person to open; finish with `login --wait --json`. Never open a browser for them. Logging in is only needed to manage music from an account on another computer.
+- Edit or delete shared music only when the person asks for that change. Preview with `--dry-run` first.
+- [docs/sharing.md](docs/sharing.md) has every sharing command, option and exit code.
+
+## Headless use
+
+`src/headless.js` validates, renders and identifies scores for servers and other tools without the studio. See [docs/headless.md](docs/headless.md).
 
 ## Development
 
-Use small topical commits. Run `npm run check` and `npm test` after relevant changes. Verify complete renders and browser playback, persistence and exports for changes affecting those flows. Keep dependencies minimal and use ordinary Node/browser mechanisms. The application must not silently invoke models or send musical data to remote services. Fix observed real failures; reviews end when no material defect remains.
+These notes are for people changing Soundroo itself. Use small topical commits. Run `npm run check` and `npm test` after changes, and check full renders, playback in the browser, saving and exports when you touch those. Keep dependencies minimal. Soundroo never calls a model or sends music anywhere on its own; only the sharing commands use the network, and only when the person asks.
