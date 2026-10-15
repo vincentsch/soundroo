@@ -49,10 +49,10 @@ the instruments and the notes. Drum patterns look like `X...x...X...x...`, and
 melodies like `G4/.5 Bb4 C5/1`. Soundroo's engine reads the score and
 synthesizes each sound from scratch, then mixes the parts into a stereo track.
 
-The engine has 28 instrument types, all made in code: clean and overdriven
+The engine has 30 instrument types, all made in code: clean and overdriven
 electric guitars, electric and synth basses, rock and electronic drums,
-electric piano, organ, analog and FM synthesizers, pads, strings, bells and
-marimba. Short spoken phrases can become rhythmic chops, tape and grain
+electric piano, organ, analog and FM synthesizers, pads, strings, bells,
+marimba and 8-bit chip sounds for video game music. Short spoken phrases can become rhythmic chops, tape and grain
 textures or a vocoder robot voice. The words come from
 [Kokoro](https://huggingface.co/hexgrad/Kokoro-82M), a small voice model that
 runs on your computer. It speaks, it doesn't sing.
