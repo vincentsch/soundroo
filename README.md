@@ -27,7 +27,7 @@
 > It works with Claude Code, Codex and other coding agents that can run
 > commands. ChatGPT and Claude use the Soundroo connector instead.
 
-Copy this into your agent and put your idea in place of the brackets:
+Copy this into your agent and put your idea where the brackets are:
 
 ```text
 Make me a track: [what it should sound like, or "surprise me"].
@@ -39,8 +39,8 @@ A few words are enough, like "a fast funk track for a summer road trip" or
 writes the track and opens a small music player in your browser. You listen,
 tell it what to change, and ask for more when you like it.
 
-Unless you ask for something calm, Soundroo makes lively music: drums and bass
-from the first bars, a hook early on and a chorus that lifts.
+Unless you ask for something calm, the music is lively: drums and bass from
+the first bars, a hook early on and a chorus or a drop.
 
 ## How does it work?
 
@@ -49,18 +49,18 @@ the instruments and the notes. Drum patterns look like `X...x...X...x...`, and
 melodies like `G4/.5 Bb4 C5/1`. Soundroo's engine reads the score and
 synthesizes each sound from scratch, then mixes the parts into a stereo track.
 
-- **Instruments.** 28 kinds, all made in code: clean and overdriven electric
-  guitars, electric and synth basses, rock and electronic drums, electric
-  piano, organ, analog and FM synthesizers, pads, strings, bells and marimba.
-- **Words.** Short spoken phrases can become rhythmic chops, tape and grain
-  textures or a vocoder robot voice. The words come from
-  [Kokoro](https://huggingface.co/hexgrad/Kokoro-82M), a small voice model that
-  runs on your computer. It speaks, it doesn't sing.
-- **Checks.** An agent can't hear music, so Soundroo checks each render for
-  clipping, silence, squashed levels and big jumps in loudness. Your ears
-  decide the rest.
-- **Editing.** Because the track is a score, the agent can change one part and
-  keep the others. "Keep the melody, make the drums softer" works.
+The engine has 28 instrument types, all made in code: clean and overdriven
+electric guitars, electric and synth basses, rock and electronic drums,
+electric piano, organ, analog and FM synthesizers, pads, strings, bells and
+marimba. Short spoken phrases can become rhythmic chops, tape and grain
+textures or a vocoder robot voice. The words come from
+[Kokoro](https://huggingface.co/hexgrad/Kokoro-82M), a small voice model that
+runs on your computer. It speaks, it doesn't sing.
+
+An agent can't hear music, so Soundroo checks each render for clipping,
+silence, squashed levels and big jumps in loudness. It can't tell whether the
+music is good. Because the track is a score, the agent can change one part and
+keep the others. "Keep the melody, make the drums softer" works.
 
 None of this needs an account, an API key, music software or a graphics card,
 and none of it leaves your computer. Your AI agent is a separate service with
@@ -68,11 +68,11 @@ its own terms and prices.
 
 ## The music player
 
-The player gives your music a home: generated cover art, collections, a queue,
-favorites and a full-screen view that moves with the music. Open a track to
-see its sections, leave notes at a moment in the track or compare versions.
-The mixer changes levels, panning, mute and solo and saves the mix as a new
-version. Keyboard controls and light and dark themes are built in.
+The player has generated cover art, collections, a queue, favorites and a
+full-screen view that moves with the music. Open a track to see its sections,
+leave notes at a moment in the track or compare versions. The mixer changes
+levels, panning, mute and solo and saves the mix as a new version. Keyboard
+controls and light and dark themes are built in.
 
 You can download each track as WAV, the editable score, MIDI for other music
 programs, separate instrument tracks (stems) and a small listening page that
@@ -86,11 +86,11 @@ soundroo.com renders the audio with the same engine. You get links that play
 in any browser, to send to friends.
 
 The first share needs no account. Soundroo makes an artist page for you with a
-generated name, and its music is unlisted. That page holds up to 10 tracks. To
+made-up name, and its music is unlisted. That page holds up to 10 tracks. To
 keep it and list your music publicly, give the agent your email address. It
-runs `node bin/soundroo.js claim --email you@example.com`, and you confirm the
-link in the email. [Sharing](docs/sharing.md) explains what is sent and every
-option.
+runs `node bin/soundroo.js claim --email you@example.com`, and you open the
+email and press the button. [Sharing](docs/sharing.md) explains what is sent
+and every option.
 
 ## ChatGPT and Claude
 
