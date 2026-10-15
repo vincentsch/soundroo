@@ -33,6 +33,8 @@ const definitions = [
   ['crash', 'Crash cymbal', 'Noise and inharmonic metallic partials with a long decay.', 0, {}],
   ['ride', 'Ride cymbal', 'Metallic ping and restrained cymbal wash.', 0, {}],
   ['open-hat', 'Open hi-hat', 'A longer high-frequency noise decay.', 0, {}],
+  ['chip-lead', 'Chip lead', 'Pulse wave like an 8-bit game console. Duty 0.125 sounds thin, 0.25 classic, 0.5 like a hollow square.', 80, { duty: control(0.05, 0.5, 0.25, 'Pulse width: 0.125 thin, 0.25 classic, 0.5 square.'), attack: { ...attack, default: 0.002 }, release: { ...release, default: 0.06 } }],
+  ['chip-bass', 'Chip bass', 'Triangle wave bass like an 8-bit game console.', 38, { release: { ...release, default: 0.04 } }],
 ];
 export const SAMPLE_ASSETS = ['made-of-light', 'stay-a-little', 'in-the-rhythm', 'city-never-sleeps', 'let-it-change', 'slow-down'];
 export const SAMPLE_EFFECTS = ['dry', 'tape', 'granular', 'vocoder', 'chop'];

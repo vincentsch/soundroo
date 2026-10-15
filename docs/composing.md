@@ -76,6 +76,8 @@ For guitar-led music, use `guitar-clean`, `guitar-crunch` and `electric-bass`. T
 
 `rock-kick`, `rock-snare`, `tom`, `crash`, `ride` and `open-hat` add a more assertive drum palette. Synthesized tom pitch follows the note. MIDI preserves standard tom pitches 41, 43, 45, 47, 48 and 50; other pitches map to the nearest GM tom to avoid selecting cymbals. Use the standard pitches for portable fills. Rock needs purposeful backbeats and fills, while modern pop needs a clear lead hook, bass motion and chorus lift. More guidance and example directions are in [Musical directions](musical-directions.md).
 
+For video game music, `chip-lead` is a pulse wave like the sound chips in 8-bit consoles. Its `duty` sets the pulse width: 0.125 is thin and nasal, 0.25 the classic lead, 0.5 a hollow square. `chip-bass` is a triangle bass. Use them with `kick`, `snare` and `hi-hat`, fast sixteenth-note arpeggios and little reverb. [`examples/pixel-grand-prix.json`](../examples/pixel-grand-prix.json) is a complete 8-bit racing theme.
+
 Piano and strings are synthesis approximations. Their advantage is portable, editable sound with no instrument-bank download; do not describe them as recordings of acoustic instruments. Electronic timbres, mallets, textures and processed speech are part of the native palette.
 
 Each piece should have a musical identity. Vary motif, harmony, rhythm, dynamics, density, register and arrangement. Use named pattern variations and a contrasting section. Avoid stacking every instrument at full level or using a lead continuously. A deliberate ending needs room for releases; simply truncating the final note can make a valid score sound unfinished.

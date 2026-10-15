@@ -606,12 +606,13 @@ export class Synth {
           }
           break;
         }
-        case 3: { // square: difference of two band-limited saws
+        case 3: { // pulse: difference of two band-limited saws; duty 0.5 is a square
           const env = L.freqEnv;
+          const duty = L.duty ?? 0.5;
           let dt = fixed / sr;
           for (let k = 0; k < cnt; k++) {
             if (env) dt = (fq[k] * mul) / sr;
-            let p2 = ph + 0.5;
+            let p2 = ph + duty;
             if (p2 >= 1) p2 -= 1;
             const s = (2 * ph - 1 - polyblep(ph, dt) - (2 * p2 - 1 - polyblep(p2, dt))) * 0.5;
             acc[k] += s * amp[k];

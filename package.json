@@ -1,6 +1,6 @@
 {
   "name": "soundroo",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Original music made with your coding agent. A local composition toolkit and listening studio.",
   "private": true,
   "type": "module",

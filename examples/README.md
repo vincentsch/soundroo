@@ -4,6 +4,8 @@
 
 Both collections are labeled `source: "examples"`; neither generates personalized music or invokes a model or online service.
 
+`streetlight-funk.json` (116 BPM funk) and `pixel-grand-prix.json` (152 BPM 8-bit racing theme with the `chip-lead` and `chip-bass` instruments) are complete lively tracks in score version 2, labeled `origin: "example"`.
+
 `paper-satellites.json` is a single built-in example in score version 2, labeled `origin: "example"`. Its drums are `steps` strings and its bass, chords, hook and countermelody are `line` strings, so about 5 KB of JSON expands into roughly 1,300 notes and 81 seconds of music. It demonstrates the notation; it is not personalized music.
 
 ## The Open Window

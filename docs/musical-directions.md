@@ -31,6 +31,7 @@ For an open brief, vary the musical purpose as well as the instruments:
 | UK garage / breakbeat | Skipping kicks, offbeat percussion, shuffled timing and short vocal chops when appropriate. |
 | Work grooves | Steady rhythm, fewer foreground notes and slow changes in texture. They can be lively without demanding attention. |
 | Drum and bass | A fast breakbeat with a slower harmonic pulse, a firm bass motif and a clear change in density at the drop. |
+| Video game / chiptune | `chip-lead` pulse hooks and sixteenth-note arpeggios, a `chip-bass` triangle line, tight noise drums, little reverb, 130 to 180 BPM. Racing, overworld, boss and adventure themes each want their own mood. Write original themes; never recreate a melody from a real game. |
 
 These are broad starting points, not templates to rename. Write different motifs, rhythms, forms and hooks. A user who asks for rock should receive guitar-led music, not ambient synth music with a rock label. For more unusual art, change those conventions deliberately.
 

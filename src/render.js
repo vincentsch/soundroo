@@ -47,6 +47,8 @@ function sustained(synth, lane, t, pitch, velocity, duration, id, tone, rng) {
       v.layer({ wave: WAVES.sine, freq: f * ratio, amp: new Env(0).set(0, t).lin(level * velocity, t + 0.003).target(level * velocity * 0.08, t + 0.003, 0.38 / ratio).target(0, t + duration, release / 3) });
     }
   } else if (id === 'noise') v.layer({ wave: WAVES.pink, seed: Math.floor(rng.next() * 0xffffffff), amp: envelope(0.055), freq: 0 });
+  else if (id === 'chip-lead') v.layer({ wave: WAVES.square, duty: tone.duty, freq: f, amp: envelope(0.085) });
+  else if (id === 'chip-bass') v.layer({ wave: WAVES.tri, freq: f, amp: envelope(0.2) });
   else for (const detune of [-(tone.detune ?? 8), tone.detune ?? 8]) v.layer({ wave: WAVES.saw, freq: f, detune, amp: envelope(0.045) });
   synth.add(lane, v);
 }

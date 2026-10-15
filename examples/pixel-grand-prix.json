@@ -1,0 +1,57 @@
+{
+  "version": 2,
+  "id": "pixel-grand-prix",
+  "origin": "example",
+  "title": "Pixel Grand Prix",
+  "description": "A built-in example of 8-bit game music: a 152 BPM racing theme with a pulse-wave hook, fast arpeggios, a triangle bass and noise drums.",
+  "genre": "Chiptune",
+  "mood": "Fast, bright, competitive",
+  "key": "A major",
+  "bpm": 152,
+  "beats": 148,
+  "seed": 3,
+  "master": { "volume": 0.9, "reverb": 0.08 },
+  "sections": [
+    { "id": "countdown", "name": "Countdown", "beat": 0, "beats": 8 },
+    { "id": "lap-one", "name": "Lap one", "beat": 8, "beats": 32 },
+    { "id": "boost", "name": "Boost", "beat": 40, "beats": 32 },
+    { "id": "shortcut", "name": "Shortcut", "beat": 72, "beats": 16 },
+    { "id": "final-lap", "name": "Final lap", "beat": 88, "beats": 48 },
+    { "id": "finish", "name": "Finish line", "beat": 136, "beats": 12 }
+  ],
+  "parts": [
+    { "id": "kick", "name": "Kick", "instrument": "kick", "volume": 0.8,
+      "patterns": { "drive": { "beats": 4, "steps": "X.......X.x....." }, "last": { "beats": 4, "steps": "X..............." } },
+      "clips": [{ "pattern": "drive", "beat": 8, "repeat": 16 }, { "pattern": "drive", "beat": 88, "repeat": 12 }, { "pattern": "last", "beat": 136 }] },
+    { "id": "snare", "name": "Noise snare", "instrument": "snare", "volume": 0.6,
+      "patterns": {
+        "count": { "beats": 8, "steps": "X...X...X...X...|x.x.x.x.XXXXXXXX" },
+        "back": { "beats": 4, "steps": "....X.......X..x" },
+        "fill": { "beats": 4, "steps": "....X...x.xxXXXX" } },
+      "clips": [{ "pattern": "count", "beat": 0 }, { "pattern": "back", "beat": 8, "repeat": 7 }, { "pattern": "fill", "beat": 36 }, { "pattern": "back", "beat": 40, "repeat": 7 }, { "pattern": "fill", "beat": 68 }, { "pattern": "fill", "beat": 84 }, { "pattern": "back", "beat": 88, "repeat": 11 }, { "pattern": "fill", "beat": 132 }] },
+    { "id": "hats", "name": "Noise hats", "instrument": "hi-hat", "volume": 0.45,
+      "patterns": { "run": { "beats": 4, "steps": "x.xxx.xxx.xxx.xx" } },
+      "clips": [{ "pattern": "run", "beat": 8, "repeat": 32 }] },
+    { "id": "bass", "name": "Triangle bass", "instrument": "chip-bass", "volume": 1,
+      "patterns": {
+        "verse": { "beats": 8, "line": "A2/.5 A3 A2 A3 A2 A3 G2 G3 | F#2 F#3 F#2 F#3 E2 E3 E2 E3" },
+        "boost": { "beats": 8, "line": "D2/.5 D3 D2 D3 E2 E3 E2 E3 | C#2 C#3 F#2 F#3 B1 B2 E2 E3" },
+        "end": { "beats": 4, "line": "A2/2@.9" } },
+      "clips": [{ "pattern": "verse", "beat": 8, "repeat": 4 }, { "pattern": "boost", "beat": 40, "repeat": 4 }, { "pattern": "verse", "beat": 72, "repeat": 2 }, { "pattern": "verse", "beat": 88, "repeat": 2 }, { "pattern": "boost", "beat": 104, "repeat": 4 }, { "pattern": "end", "beat": 136 }] },
+    { "id": "arp", "name": "Arpeggio", "instrument": "chip-lead", "volume": 0.5, "pan": -0.2, "tone": { "duty": 0.125, "release": 0.03 },
+      "patterns": {
+        "verse": { "beats": 4, "line": "A4/.25 C#5 E5 A5 E5 C#5 A4 C#5 | G4 B4 D5 G5 D5 B4 G4 B4" },
+        "boost": { "beats": 4, "line": "D5/.25 F#5 A5 D6 A5 F#5 D5 F#5 | E5 G#5 B5 E6 B5 G#5 E5 G#5" } },
+      "clips": [{ "pattern": "verse", "beat": 0, "repeat": 10 }, { "pattern": "boost", "beat": 40, "repeat": 8 }, { "pattern": "verse", "beat": 72, "repeat": 4, "velocity": 0.7 }, { "pattern": "boost", "beat": 104, "repeat": 8 }] },
+    { "id": "hook", "name": "Pulse hook", "instrument": "chip-lead", "volume": 0.75, "pan": 0.1, "tone": { "duty": 0.25 },
+      "patterns": {
+        "hook": { "beats": 8, "line": "E5/.5 E5 -/.25 C#5/.25 E5/.5 A5/1 G#5/.5 F#5 | F#5/.75 E5/.25 C#5/.5 B4 C#5/1 -/1" },
+        "boost": { "beats": 8, "line": "A5/.5 B5 C#6/.75 A5/.25 B5/.5 A5 F#5/1 | G#5/.5 A5 B5/.75 G#5/.25 E5/1 -/1" },
+        "shortcut": { "beats": 16, "line": "C#5/1 E5 A5/2 G#5/1 F#5 E5/2 | D5/1 F#5 A5/2 G#5/1 E5 B4/2" },
+        "flag": { "beats": 4, "line": "A5/.25 C#6 E6 A6/2.25@.9 -/1" } },
+      "clips": [{ "pattern": "hook", "beat": 8, "repeat": 4 }, { "pattern": "boost", "beat": 40, "repeat": 4 }, { "pattern": "shortcut", "beat": 72 }, { "pattern": "hook", "beat": 88, "repeat": 2, "transpose": 2 }, { "pattern": "boost", "beat": 104, "repeat": 4, "transpose": 2 }, { "pattern": "flag", "beat": 136 }] },
+    { "id": "echo", "name": "Echo voice", "instrument": "chip-lead", "volume": 0.35, "pan": 0.35, "tone": { "duty": 0.5, "release": 0.12 },
+      "patterns": { "hook": { "beats": 8, "line": "-/.75 E5/.5 E5 -/.25 C#5/.25 E5/.5 A5/1 G#5/.5 F#5 | F#5/.75 E5/.25 C#5/.5 B4 C#5/.25 -/.75" } },
+      "clips": [{ "pattern": "hook", "beat": 24, "repeat": 2 }] }
+  ]
+}

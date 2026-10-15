@@ -93,7 +93,7 @@ test('ten complete examples have unique music, form, speech boundaries and edita
 
 test('all presets produce finite audible samples and supported tone controls change sound', async () => {
   const catalog = getCatalog();
-  assert.equal(catalog.instruments.length, 28);
+  assert.equal(catalog.instruments.length, 30);
   for (const preset of catalog.instruments) {
     const score = fixture(); score.parts = [{ ...score.parts[0], instrument: preset.id, notes: [note(preset.drums ? 36 : 60, 0, 2)] }];
     if (preset.id === 'sample') score.parts[0].sample = { asset: 'builtin:made-of-light', effect: 'dry' };
@@ -209,4 +209,22 @@ test('progress is monotonic, yields to the event loop and can cancel without par
   await assert.rejects(renderScore(fixture(), { ...options, signal: controller.signal }), { name: 'AbortError' });
   const during = new AbortController(); setImmediate(() => during.abort());
   await assert.rejects(renderScore(fixture(), { ...options, signal: during.signal }), { name: 'AbortError' });
+});
+
+test('chip instruments render pulse and triangle waves and the pulse width changes the sound', async () => {
+  const score = duty => ({
+    version: 2, id: 'chip', title: 'Chip', bpm: 150, beats: 8, seed: 1, master: { volume: 0.9, reverb: 0 },
+    parts: [
+      { id: 'lead', instrument: 'chip-lead', tone: { duty }, patterns: { a: { beats: 4, line: 'A4/.25 C#5 E5 A5 E5 C#5 A4 C#5 A4/2' } }, clips: [{ pattern: 'a', beat: 0, repeat: 2 }] },
+      { id: 'bass', instrument: 'chip-bass', patterns: { b: { beats: 4, line: 'A2/.5 A3 A2 A3 E2 E3 E2 E3' } }, clips: [{ pattern: 'b', beat: 0, repeat: 2 }] },
+    ],
+  });
+  const thin = await renderScore(score(0.125));
+  const square = await renderScore(score(0.5));
+  assert.ok(thin.report.rmsDb > -40 && thin.report.peakDb < 0, 'audible and not clipping');
+  let difference = 0;
+  const [a, b] = [thin.audio.getChannelData(0), square.audio.getChannelData(0)];
+  for (let i = 0; i < a.length; i += 97) difference += Math.abs(a[i] - b[i]);
+  assert.ok(difference > 1, 'the duty setting changes the waveform');
+  assert.deepEqual(validateScore({ ...score(0.9) }).issues.map(i => i.path), ['parts[0].tone.duty']);
 });
