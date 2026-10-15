@@ -87,6 +87,7 @@ When they say yes:
 3. Give them the collection link and the track links. The tracks play once soundroo.com has rendered them, usually within a minute or two.
 4. Offer to keep the page: "If you give me your email address, I'll send you a link. Confirm it and the artist page is yours, so you can list your music on Soundroo and share more than 10 tracks." If they give one, run `node bin/soundroo.js claim --email <address> --json` and tell them to open the email and press the button. It works once and expires in an hour.
 5. The share output also has a private claim link. Give it to the person and say that whoever opens it can take over the artist page, so they should keep it to themselves.
+6. Once they've confirmed the email, their music can be listed on soundroo.com. If they want that, run the share command again with `--visibility public`.
 
 An artist page without an owner holds up to 10 tracks. If sharing fails with `claim_required`, explain that and offer the email step. Never create another guest page or log out to get around it. Throwaway email addresses (Mailinator and the like) are refused.
 

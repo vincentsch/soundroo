@@ -48,6 +48,10 @@ func TestErrorBodiesInEveryServiceShape(t *testing.T) {
 	if app.Code != "validation_failed" || app.ServiceCode != "duplicate_music" || app.Message != "This music already belongs to another artist." || len(app.Issues) != 1 {
 		t.Fatalf("application error: %+v", app)
 	}
+	both := statusError(422, []byte(`{"error":{"code":"invalid_request","message":"Use another address.","issues":[{"path":"email","message":"Use another address."}]},"message":"Use another address.","errors":{"email":["Use another address."]}}`), 0)
+	if len(both.Issues) != 1 || both.Issues[0].Path != "email" {
+		t.Fatalf("the same problem in both shapes is reported once: %+v", both.Issues)
+	}
 	device := statusError(400, []byte(`{"error":"authorization_pending","error_description":"Waiting for approval."}`), 0)
 	if device.ServiceCode != "authorization_pending" || device.Message != "Waiting for approval." {
 		t.Fatalf("device error: %+v", device)

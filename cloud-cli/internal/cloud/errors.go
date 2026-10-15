@@ -129,7 +129,17 @@ func parseErrorBody(body []byte) (message, code string, issues []Issue) {
 			issues = append(issues, Issue{Path: path, Message: item})
 		}
 	}
-	return strings.TrimSpace(message), code, issues
+	// The application sends the same problems both as error.issues and in
+	// Laravel's errors map; report each one once.
+	seen := make(map[Issue]bool, len(issues))
+	unique := issues[:0]
+	for _, issue := range issues {
+		if !seen[issue] {
+			seen[issue] = true
+			unique = append(unique, issue)
+		}
+	}
+	return strings.TrimSpace(message), code, unique
 }
 
 // statusError maps an HTTP failure to the stable contract.
