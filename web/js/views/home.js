@@ -56,7 +56,7 @@ function hero() {
         h('button', { type: 'button', class: 'btn btn-primary', disabled: !playable, dataset: { key: 'hero-play' }, onclick: () => player.playContext(collectionIds(), null, { shuffle: false }) }, icon('play'), 'Play'),
         h('button', { type: 'button', class: 'btn btn-tinted', disabled: !playable, dataset: { key: 'hero-shuffle' }, onclick: () => player.playContext(collectionIds(), null, { shuffle: true }) }, icon('shuffle'), 'Shuffle')),
       collection?.source === 'examples'
-        ? h('p', { class: 'hero-note' }, 'Built-in examples. ', h('a', { href: '#/make' }, 'Make your own collection'), ' with your coding agent.')
+        ? h('p', { class: 'hero-note' }, 'Example tracks that come with Soundroo. ', h('a', { href: '#/make' }, 'Make your own'), ' with your AI agent.')
         : null));
 }
 

@@ -1,0 +1,63 @@
+{
+  "version": 2,
+  "id": "streetlight-funk",
+  "origin": "example",
+  "title": "Streetlight Funk",
+  "description": "A built-in example of a lively track: a strutting funk groove with muted guitar scratch, a bass riff that jumps octaves, electric piano stabs and a synth hook that comes in on bar five.",
+  "genre": "Funk",
+  "mood": "Strutting, bright",
+  "key": "E minor",
+  "bpm": 116,
+  "beats": 164,
+  "seed": 7,
+  "master": { "volume": 0.9, "reverb": 0.18 },
+  "sections": [
+    { "id": "count-in", "name": "Count-in", "beat": 0, "beats": 16 },
+    { "id": "groove", "name": "Groove", "beat": 16, "beats": 32 },
+    { "id": "build", "name": "Build", "beat": 48, "beats": 8 },
+    { "id": "chorus", "name": "Chorus", "beat": 56, "beats": 32 },
+    { "id": "break", "name": "Break", "beat": 88, "beats": 16 },
+    { "id": "last-chorus", "name": "Last chorus", "beat": 104, "beats": 48 },
+    { "id": "ending", "name": "Ending", "beat": 152, "beats": 12 }
+  ],
+  "parts": [
+    { "id": "kick", "name": "Kick", "instrument": "kick", "volume": 0.95,
+      "patterns": {
+        "funk": { "beats": 4, "steps": "X..x..X...X..x.." },
+        "push": { "beats": 8, "steps": "X..x..X...X..x..|X.X.X.X.XXXXXXXX" },
+        "last": { "beats": 4, "steps": "X..............." } },
+      "clips": [{ "pattern": "funk", "beat": 0, "repeat": 12 }, { "pattern": "push", "beat": 48 }, { "pattern": "funk", "beat": 56, "repeat": 8 }, { "pattern": "funk", "beat": 96, "repeat": 14 }, { "pattern": "last", "beat": 152 }] },
+    { "id": "snare", "name": "Snare", "instrument": "snare", "volume": 0.8,
+      "patterns": {
+        "backbeat": { "beats": 4, "steps": "....X..o.o..X..o" },
+        "fill": { "beats": 4, "steps": "....X..o.oX.XxXX" },
+        "roll": { "beats": 8, "steps": "x...x...x...x...|x.x.x.x.xxxxXXXX" } },
+      "clips": [{ "pattern": "backbeat", "beat": 0, "repeat": 3 }, { "pattern": "fill", "beat": 12 }, { "pattern": "backbeat", "beat": 16, "repeat": 7 }, { "pattern": "fill", "beat": 44 }, { "pattern": "roll", "beat": 48 }, { "pattern": "backbeat", "beat": 56, "repeat": 7 }, { "pattern": "fill", "beat": 84 }, { "pattern": "backbeat", "beat": 96, "repeat": 13 }, { "pattern": "fill", "beat": 148 }] },
+    { "id": "hats", "name": "Hats", "instrument": "hi-hat", "volume": 0.5, "pan": 0.18,
+      "patterns": { "sixteenths": { "beats": 4, "steps": "XxoxXxoxXxoxXxox" } },
+      "clips": [{ "pattern": "sixteenths", "beat": 0, "repeat": 38 }] },
+    { "id": "open-hat", "name": "Open hat", "instrument": "open-hat", "volume": 0.45, "pan": -0.15,
+      "patterns": { "offbeat": { "beats": 4, "steps": "..x...x...x...x." } },
+      "clips": [{ "pattern": "offbeat", "beat": 56, "repeat": 8 }, { "pattern": "offbeat", "beat": 104, "repeat": 12 }] },
+    { "id": "crash", "name": "Crash", "instrument": "crash", "volume": 0.55,
+      "patterns": { "hit": { "beats": 4, "steps": "X..............." } },
+      "clips": [{ "pattern": "hit", "beat": 16 }, { "pattern": "hit", "beat": 56 }, { "pattern": "hit", "beat": 104 }, { "pattern": "hit", "beat": 152 }] },
+    { "id": "bass", "name": "Bass", "instrument": "electric-bass", "volume": 0.85, "tone": { "palmMute": 0.4 },
+      "patterns": {
+        "riff": { "beats": 8, "line": "E2/.5 -/.25 E3/.25 -/.5 E2/.25 G2/.25 -/.5 A2/.5 B2/.25 -/.25 D3/.5 | E2/.5 -/.25 E3/.25 -/.5 E2/.25 G2/.25 -/.5 B1/.5 D2/.25 -/.25 Eb2/.5" },
+        "chorus": { "beats": 8, "line": "C2/.5 -/.25 C3/.25 -/.5 C2/.25 E2/.25 G2/.5 A2/.5 -/1 | D2/.5 -/.25 D3/.25 -/.5 D2/.25 F#2/.25 A2/.5 B2/.5 -/1" },
+        "end": { "beats": 4, "line": "E2/2@.9" } },
+      "clips": [{ "pattern": "riff", "beat": 16, "repeat": 5 }, { "pattern": "chorus", "beat": 56, "repeat": 4 }, { "pattern": "riff", "beat": 88, "repeat": 2 }, { "pattern": "chorus", "beat": 104, "repeat": 6 }, { "pattern": "end", "beat": 152 }] },
+    { "id": "guitar", "name": "Scratch guitar", "instrument": "guitar-clean", "volume": 0.5, "pan": -0.35, "tone": { "palmMute": 0.7 },
+      "patterns": { "scratch": { "beats": 4, "line": "-/.25 [E4 G4 B4 D5]/.25@.6 -/.25 [E4 G4 B4 D5]/.25@.4 -/.5 [E4 G4 B4 D5]/.25@.65 -/.25 -/.25 [E4 G4 B4 D5]/.25@.4 -/.5 [E4 G4 B4 D5]/.25@.6 -/.25 -/.5" } },
+      "clips": [{ "pattern": "scratch", "beat": 0, "repeat": 22 }, { "pattern": "scratch", "beat": 104, "repeat": 12 }] },
+    { "id": "keys", "name": "Electric piano", "instrument": "electric-piano", "volume": 0.55, "pan": 0.3,
+      "patterns": { "stabs": { "beats": 8, "line": "-/1.5 [C4 E4 G4 B4]/.5@.6 -/1.5 [C4 E4 G4 B4]/.5@.5 -/1.5 [D4 F#4 A4 C5]/.5@.6 -/1 [D4 F#4 A4 C5]/1@.55" } },
+      "clips": [{ "pattern": "stabs", "beat": 56, "repeat": 4 }, { "pattern": "stabs", "beat": 104, "repeat": 6 }] },
+    { "id": "hook", "name": "Synth hook", "instrument": "analog-lead", "volume": 0.6, "pan": 0.05,
+      "patterns": {
+        "hook": { "beats": 8, "line": "B4/.5 D5/.25 E5/.75 -/.5 E5/.25 G5/.25 E5/.5 D5/.5 B4/1 -/.5 A4/.5 B4/1.5 -/1" },
+        "lift": { "beats": 8, "line": "G5/.5 A5/.25 B5/.75 -/.5 B5/.25 D6/.25 B5/.5 A5/.5 G5/1 -/.5 F#5/.5 E5/1.5 -/1" } },
+      "clips": [{ "pattern": "hook", "beat": 16, "repeat": 4, "velocity": 0.85 }, { "pattern": "lift", "beat": 56, "repeat": 4 }, { "pattern": "hook", "beat": 104, "repeat": 2 }, { "pattern": "lift", "beat": 120, "repeat": 4 }] }
+  ]
+}

@@ -8,85 +8,24 @@ Create an empty personal library first:
 node bin/soundroo.js init library/my-music --title "After Hours"
 ```
 
-Keep the composition script and scores in that library. Add each score with the CLI, render the collection and start the studio. A new musical brief normally deserves original motifs, harmony, rhythms and instrumentation; changing the seed on the example collection does not personalize it.
+Keep the scores and any script that writes them in that library. Add each score with the CLI, render and start the studio. Each new request deserves its own motifs, harmony, rhythms and instruments; changing the seed of an example does not make new music. Read [Musical directions](musical-directions.md) before you write: unless someone asks for calm music, Soundroo tracks are lively and rhythm-led.
 
 ## A complete example
 
-Save this as `library/my-music/compose.mjs` from the Soundroo source folder:
+[`examples/streetlight-funk.json`](../examples/streetlight-funk.json) is a whole track in about 6 KB: a 116 BPM funk groove with a syncopated kick, ghost-note snare, sixteenth hats, a bass riff that jumps octaves, muted guitar scratches, electric piano stabs and a synth hook from bar five. It has a count-in, a groove section, a build with a snare roll, a chorus where the hook moves up, a break without kick and snare, a longer last chorus and an ending. Read it for the shape, then write your own music. [Grooves](grooves.md) has drum and bass patterns for other styles.
 
-```js
-import fs from 'node:fs';
-import {
-  note, pattern, transformPattern, arrangePattern,
-  chordPitches, chordNotes, makeSections,
-} from '../../src/compose.js';
-
-const sections = makeSections([
-  ['opening', 'The room', 4],
-  ['theme', 'A small light', 8],
-  ['contrast', 'Outside', 4],
-  ['return', 'Home again', 8],
-  ['ending', 'Let it settle', 4],
-]);
-const score = {
-  version: 1,
-  id: 'quiet-hours',
-  title: 'Quiet Hours',
-  description: 'A soft electric-piano motif that opens into a brighter answer.',
-  genre: 'Downtempo',
-  mood: 'Warm, reflective',
-  key: 'C minor',
-  bpm: 90,
-  beats: sections.at(-1).beat + sections.at(-1).beats,
-  seed: 42,
-  master: { volume: 0.9, reverb: 0.25 },
-  sections,
-  parts: [
-    { id: 'keys', name: 'Electric piano', instrument: 'electric-piano', volume: 1, pan: -0.12, notes: [], tone: { brightness: 3200 } },
-    { id: 'bass', name: 'Round bass', instrument: 'bass', volume: 0.75, pan: 0, notes: [] },
-    { id: 'bells', name: 'Distant bells', instrument: 'bell', volume: 0.55, pan: 0.35, notes: [], tone: { release: 1.7 } },
-  ],
-};
-const [keys, bass, bells] = score.parts;
-const motif = pattern(8, [
-  note('G4', 0, 0.7, 0.65), note('Eb5', 1.5, 0.6, 0.55),
-  note('D5', 3, 0.8, 0.6), note('C5', 4.5, 1.2, 0.65),
-  note('G4', 6.5, 0.7, 0.5),
-]);
-const progression = [['C3', 'min7'], ['Ab2', 'maj7'], ['Eb3', 'maj7'], ['G2', 'sus4']];
-for (const section of sections) {
-  const ending = section.id === 'ending';
-  if (!ending) {
-    const source = section.id === 'contrast'
-      ? transformPattern(motif, { transpose: 7, velocity: 0.8 }) : motif;
-    arrangePattern(keys, section.id === 'contrast' ? 'answer' : 'theme', source, {
-      beat: section.beat,
-      repeat: section.beats / source.beats,
-      velocity: section.id === 'opening' ? 0.65 : 1,
-    });
-  }
-  for (let offset = 0; offset < section.beats; offset += 4) {
-    const [root, quality] = ending ? ['C3', 'min7'] : progression[(offset / 4) % 4];
-    const pitches = chordPitches(root, quality);
-    keys.notes.push(...chordNotes(pitches, section.beat + offset, 2.8, ending ? 0.3 : 0.35, { strum: 0.012 }));
-    if (section.id !== 'opening') bass.notes.push(note(pitches[0] - 12, section.beat + offset, 2.7, 0.5));
-    if (section.id === 'return' && offset % 8 === 0) bells.notes.push(note('G5', section.beat + offset + 2, 0.5, 0.35));
-  }
-}
-fs.writeFileSync(new URL('quiet-hours.json', import.meta.url), JSON.stringify(score, null, 2) + '\n');
-```
-
-Then:
+Write a score as JSON, or write a small script that builds it, and keep it in the library:
 
 ```bash
-node library/my-music/compose.mjs
-node bin/soundroo.js validate library/my-music/quiet-hours.json --json
-node bin/soundroo.js add library/my-music/quiet-hours.json --library library/my-music
-node bin/soundroo.js render quiet-hours --library library/my-music --json
+node bin/soundroo.js validate library/my-music/my-track.json --json
+node bin/soundroo.js add library/my-music/my-track.json --library library/my-music
+node bin/soundroo.js render my-track --library library/my-music --json
 node bin/soundroo.js start library/my-music
 ```
 
-For a revision, change the score or its source script, use `add --replace`, then render again. Previous rendered versions stay in the studio. Preserve a user's `mix.json` when changing notes unless they asked for a new mix.
+A script helps when a track repeats ideas with changes. `src/compose.js` has helpers for that: `note`, `chordPitches`, `chordNotes`, `pattern`, `transformPattern`, `arrangePattern`, `arpeggiate` and `makeSections`. Import them from the library folder with `import { pattern, arrangePattern } from '../../src/compose.js';` and write the finished score with `fs.writeFileSync`. [`examples/variety.js`](../examples/variety.js) builds the ten Turn It Up tracks this way.
+
+For a revision, change the score or its script, use `add --replace`, then render again. Previous rendered versions stay in the studio. Keep the person's `mix.json` when you change notes, unless they asked for a new mix.
 
 ## Score format
 

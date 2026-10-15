@@ -107,3 +107,15 @@ test('the compact example stays small, labeled and audible in its sections', asy
     assert.equal(report.limitedFraction, 0, section.id);
   }
 });
+
+test('the worked example in the composing guide is a lively, complete track', () => {
+  const score = JSON.parse(fs.readFileSync(new URL('../examples/streetlight-funk.json', import.meta.url), 'utf8'));
+  assert.equal(score.origin, 'example');
+  assert.deepEqual(validateScore(score), { valid: true, issues: [] });
+  assert.ok(score.bpm >= 100, 'the default sound has a lively tempo');
+  assert.equal(score.sections.at(-1).beat + score.sections.at(-1).beats, score.beats);
+  const compiled = compileScore(score);
+  const first = id => Math.min(...compiled.parts.find(p => p.id === id).notes.map(n => n.beat));
+  assert.equal(first('kick'), 0, 'drums play from the first bar');
+  assert.ok(first('hook') <= 16, 'the hook arrives within the first bars');
+});

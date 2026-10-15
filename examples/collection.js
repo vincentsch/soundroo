@@ -255,6 +255,6 @@ export function buildExampleCollection({ seed = 1, durationScale = 1 } = {}) {
   for (const track of tracks) for (const p of track.parts) {
     p.notes = p.notes.filter(n => n.beat < track.beats).map(n => ({ ...n, duration: Math.min(n.duration, track.beats - n.beat) }));
   }
-  return { collection: { version: 1, id: 'soundroo-examples', title: 'The Open Window', description: 'Ten original built-in example compositions: an editable demonstration of Soundroo, not music personalized for you.', source: 'examples', seed, tracks: tracks.map(t => t.id) }, tracks };
+  return { collection: { version: 1, id: 'soundroo-examples', title: 'The Open Window', description: 'Ten softer example tracks that come with Soundroo. Ask your AI agent for music of your own.', source: 'examples', seed, tracks: tracks.map(t => t.id) }, tracks };
 }
 export default buildExampleCollection;

@@ -1,5 +1,20 @@
 # Music with a point of view
 
+## The default sound
+
+People try Soundroo to hear something fun. Unless they ask for something calm, make it lively:
+
+- A tempo between about 100 and 140 BPM for most styles. Drum and bass sits around 174, hip-hop around 90 with busy hats.
+- Drums from the first bar, or after an intro of four to eight bars at most. Kick, a snare or clap backbeat and hats with some sixteenths. [Grooves](grooves.md) has patterns for each style.
+- A bass line that moves with the kick and answers it, not one long note per chord.
+- A short hook within the first eight bars, played by a lead with character: `analog-lead`, `fm-lead`, `guitar-crunch`, `pluck` or a vocoder phrase. Repeat it, then vary it.
+- Chords in rhythm: stabs, offbeats, strums. Pads only as a background layer.
+- Energy that changes: a build with a fill, a chorus or drop where everything plays, a break, a bigger last chorus and a real ending.
+
+Avoid these unless the person asks for them: tempos under 90, odd meters, long quiet intros, ambient pad textures, soft solo piano, and loops that never change. Calm, ambient and focus music are good choices when someone wants them. They are not the default.
+
+## Hooks, sections and variety
+
 A collection should have tunes people remember. Put a short original hook near the beginning, repeat it enough to establish an identity, then change the setting around it. Build toward a chorus or drop, thin the arrangement for contrast, and make the return feel earned. A pile of notes and a long quiet introduction do not make a song.
 
 For an open brief, vary the musical purpose as well as the instruments:

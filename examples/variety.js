@@ -1666,7 +1666,7 @@ export function buildVarietyCollection({ seed = 21 } = {}) {
   return {
     collection: {
       version: 1, id: 'turn-it-up', title: 'Turn It Up', source: 'examples', tracks: tracks.map(t => t.id),
-      description: 'Ten original built-in example pieces: boogie, garage punk and indie guitars, dance-pop, nu-disco, Afro-soul, UK garage, two focused grooves and a hyperpop finale. An editable demonstration of Soundroo, not music personalized for you.',
+      description: 'Ten example tracks that come with Soundroo: boogie, garage punk and indie guitars, dance-pop, nu-disco, Afro-soul, UK garage, two focus grooves and a hyperpop finale. Ask your AI agent for music of your own.',
     },
     tracks,
   };
