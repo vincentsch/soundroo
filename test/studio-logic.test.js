@@ -186,9 +186,9 @@ test('prompts for the coding agent', () => {
   assert.match(prompt, /No sung vocals/);
   assert.match(prompt, /AGENTS\.md/);
   assert.match(L.buildPrompt({ brief: '' }), /Describe the music here/);
-  assert.match(L.buildPrompt({ brief: 'x', count: 1 }), /1 original track\./);
+  assert.match(L.buildPrompt({ brief: 'x', count: 1 }), /^Make one original Soundroo track\./);
   assert.equal(L.trackCount(99), 20);
-  assert.equal(L.trackCount('abc'), 10);
+  assert.equal(L.trackCount('abc'), 1);
   const brief = L.composeBrief({ brief: 'Glass and steam', voice: 'instrumental' });
   assert.equal(brief, 'Glass and steam\nVoice: instrumental only.');
   const followUp = L.followUpPrompt({ path: 'requests/brief.json', count: 10 });

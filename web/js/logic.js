@@ -493,12 +493,12 @@ function noteEvent(raw, secondsPerBeat) {
 
 // --- making music -------------------------------------------------------------
 
-export const FEELS = ['Calm', 'Warm', 'Bright', 'Nocturnal', 'Driving', 'Playful', 'Wistful', 'Cinematic', 'Hypnotic', 'Airy'];
+export const FEELS = ['Driving', 'Bright', 'Playful', 'Funky', 'Dark', 'Dreamy', 'Cinematic', 'Warm', 'Calm'];
 export const LENGTHS = { '': 'Let the agent decide', short: 'About 2 minutes each', medium: 'About 3 to 4 minutes each', long: 'About 5 minutes or longer each' };
 export const VOICES = { auto: 'Let the agent decide', instrumental: 'Instrumental only', spoken: 'Spoken-word textures welcome' };
 
 export function trackCount(value) {
-  return clamp(Math.round(num(value, 10)), 1, 20);
+  return clamp(Math.round(num(value, 1)), 1, 20);
 }
 
 // The brief as stored with a saved request: the user's words plus the options
@@ -517,7 +517,7 @@ const WORKING_NOTES = "Work in the Soundroo repository and follow its AGENTS.md.
 export function buildPrompt(options = {}) {
   const count = trackCount(options.count);
   return [
-    `Make a Soundroo collection of ${plural(count, 'original track')}.`,
+    count === 1 ? 'Make one original Soundroo track.' : `Make a Soundroo collection of ${plural(count, 'original track')}.`,
     '',
     'Brief:',
     String(options.brief ?? '').trim() ? composeBrief(options) : '(Describe the music here.)',
@@ -529,7 +529,7 @@ export function buildPrompt(options = {}) {
 
 export function followUpPrompt(request) {
   const where = request.path ? `saved at ${JSON.stringify(request.path)}` : 'I saved in the Soundroo studio';
-  return `Please compose the music request ${where} (${plural(request.count || 10, 'track')}). ${WORKING_NOTES}`;
+  return `Please compose the music request ${where} (${plural(request.count || 1, 'track')}). ${WORKING_NOTES}`;
 }
 
 // --- color --------------------------------------------------------------------

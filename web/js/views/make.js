@@ -6,17 +6,18 @@ import { h, icon, toast, copyText, errorMessage } from '../dom.js';
 import { FEELS, LENGTHS, VOICES, buildPrompt, composeBrief, followUpPrompt, normalizeRequest, trackCount, formatDate, plural } from '../logic.js';
 
 const STARTERS = [
-  ['Rock and roll', 'Guitar-led rock and roll: boogie bass, crunchy riffs, strong backbeats, drum fills and hooks that arrive quickly. Give each piece a big chorus and its own identity.'],
-  ['Modern pop', 'Modern pop instrumentals with memorable lead hooks, moving bass, punchy drums and a clear verse-to-chorus lift. Vary dance-pop, indie guitar pop and soul/funk grooves.'],
-  ['Work grooves', 'Rhythmic music for working: UK garage, understated house, funk and liquid breakbeats. Keep a steady pulse and fewer foreground notes, with slow changes that hold interest.'],
-  ['Surprise me', 'A varied record with guitar-led rock, hook-driven pop, dance and funk, plus a few stylish work grooves. Distinct riffs and melodies, quick hooks and strong chorus contrasts.'],
+  ['Rock', 'Guitar-led rock: a crunchy riff, boogie or driving eighth-note bass, a hard backbeat, drum fills and a big chorus.'],
+  ['Funk and disco', 'Funk and disco: muted guitar scratches, an octave-jumping bass line, four-on-the-floor or syncopated drums and a brassy synth hook.'],
+  ['House', 'House: four-on-the-floor kick, offbeat open hats, a rolling bass line, chord stabs and a build into a drop.'],
+  ['Synthwave', 'Synthwave: 80s drums with big snares, an arpeggiated bass, a soaring analog lead and a night-drive mood.'],
+  ['Surprise me', 'Surprise me with something lively: a fun groove, a catchy hook early on and a chorus that lifts.'],
 ];
 
 export function makeView() {
   const saved = loadDraft();
   const draft = {
     brief: typeof saved?.brief === 'string' ? saved.brief : '',
-    count: trackCount(saved?.count ?? 10),
+    count: trackCount(saved?.count ?? 1),
     feel: Array.isArray(saved?.feel) ? saved.feel.filter(f => FEELS.includes(f)) : [],
     length: saved?.length in LENGTHS ? saved.length : '',
     voice: saved?.voice in VOICES ? saved.voice : 'auto',
@@ -50,7 +51,7 @@ export function makeView() {
       maxlength: '4000',
       required: true,
       'aria-describedby': 'brief-hint brief-error',
-      placeholder: 'Crunchy guitars, fast backbeats and huge hooks. Mix in some modern pop, disco and a few steady grooves for work…',
+      placeholder: 'A sunny morning drive with a bass line you can’t stop humming…',
       value: draft.brief,
       oninput: event => {
         draft.brief = event.target.value;
