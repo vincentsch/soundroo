@@ -48,7 +48,7 @@ export function cloudResult({ code, stdout, stderr }) {
   let body = null;
   try { body = JSON.parse(stderr); } catch { /* not the JSON error contract */ }
   if (body && typeof body.error === 'string') {
-    throw new ShareError(body.error, { code: body.code ?? 'error', exitCode: Number.isInteger(body.exit_code) ? body.exit_code : code, issues: body.issues, hint: body.hint, status: body.status });
+    throw new ShareError(body.error, { code: body.code ?? 'error', exitCode: Number.isInteger(body.exit_code) ? body.exit_code : code, issues: body.issues, hint: body.hint, status: body.status, serviceCode: body.service_code });
   }
   const text = stderr.trim().split('\n').slice(-3).join(' ').slice(0, 500);
   throw new ShareError(text || `soundroo-cloud stopped with exit code ${code}.`, { code: 'binary_failed', exitCode: code >= 1 && code <= 6 ? code : 2 });

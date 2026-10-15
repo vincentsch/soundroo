@@ -26,7 +26,8 @@ if (Array.isArray(answer)) answer = answer[Math.min(seen[command], answer.length
 if (command === 'version') answer = answer || { name: 'soundroo-cloud', version: '0.1.0', protocol: 1, os: 'linux', arch: 'amd64' };
 if (!answer) { process.stderr.write(JSON.stringify({ error: `stub has no answer for ${command}`, code: 'usage', exit_code: 1 })); process.exit(1); }
 if (answer.fail) {
-  process.stderr.write(JSON.stringify({ error: answer.fail.error, code: answer.fail.code, exit_code: answer.fail.exit, ...(answer.fail.issues ? { issues: answer.fail.issues } : {}) }, null, 2) + '\n');
+  const { error, code, exit, ...details } = answer.fail;
+  process.stderr.write(JSON.stringify({ error, code, exit_code: exit, ...details }, null, 2) + '\n');
   process.exit(answer.fail.exit);
 }
 if (answer.text) { process.stdout.write(answer.text); process.exit(0); }

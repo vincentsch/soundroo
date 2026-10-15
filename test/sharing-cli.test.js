@@ -115,6 +115,52 @@ test('service errors keep their exit codes and stable JSON', { skip }, async () 
   assert.equal(badService.json.code, 'invalid_service');
 });
 
+test('a full unclaimed page asks to claim it by email instead of making another guest', { skip }, async () => {
+  const directory = await makeLibrary();
+  const message = 'An unclaimed artist page holds up to 10 tracks, and this one has 10. Claim the page with your email address to share more.';
+  const stub = installStub({ publish: { fail: { exit: 4, code: 'claim_required', service_code: 'claim_required', status: 403, error: message } }, 'auth status': guestKey });
+  const result = await run('share', { options: { library: directory, 'rights-accepted': true, json: true }, env: stub.env });
+  assert.equal(result.code, 4);
+  assert.equal(result.json.code, 'claim_required');
+  assert.equal(result.json.serviceCode, 'claim_required');
+  assert.equal(result.json.error, message);
+  assert.equal(result.json.claimUrl, 'https://soundroo.com/claim/again');
+  assert.match(result.json.hint, /node bin\/soundroo\.js claim --email you@example\.com/);
+  assert.deepEqual(stub.calls().map(c => c.command), ['version', 'publish', 'auth status']);
+  const human = await run('share', { options: { library: directory, 'rights-accepted': true }, env: stub.env });
+  assert.equal(human.code, 4);
+  const text = human.err.join('\n');
+  assert.ok(text.includes(`Soundroo: ${message}`) && text.includes('claim --email') && text.includes('https://soundroo.com/claim/again'), text);
+  assert.ok(!stub.calls().some(c => c.argv.includes('--no-guest') || c.command === 'login'), 'no other identity is created');
+});
+
+test('claim emails the link through soundroo-cloud and previews offline', { skip }, async () => {
+  const answer = { service: origin, sent: true, email: 'mara@example.com', artist: { handle: 'amber-orchard', name: 'Amber Orchard' }, expiresInMinutes: 60 };
+  const stub = installStub({ version: { name: 'soundroo-cloud', version: '0.2.0', protocol: 1 }, claim: answer });
+  const sent = await run('claim', { options: { email: ' Mara@Example.com ', json: true }, env: stub.env });
+  assert.equal(sent.code, 0);
+  assert.deepEqual(sent.json, answer);
+  assert.deepEqual(stub.calls().at(-1).argv, ['--no-prompt', '--service', origin, '--json', 'claim', '--email', 'mara@example.com']);
+  stub.reset();
+  const preview = await run('claim', { options: { email: 'mara@example.com', 'dry-run': true, json: true }, env: stub.env });
+  assert.equal(preview.code, 0);
+  assert.deepEqual(preview.json, { dryRun: true, service: origin, request: { method: 'POST', path: '/api/v1/claim-email', body: { email: 'mara@example.com' } }, changes: 'none' });
+  assert.deepEqual(stub.calls(), []);
+  const missing = await run('claim', { options: { json: true }, env: stub.env });
+  assert.equal(missing.code, 1);
+  assert.equal(missing.json.code, 'usage');
+});
+
+test('claim explains an outdated soundroo-cloud instead of failing on an unknown command', { skip }, async () => {
+  const stub = installStub({ version: { name: 'soundroo-cloud', version: '0.1.0', protocol: 1 } });
+  const result = await run('claim', { options: { email: 'mara@example.com', json: true }, env: stub.env });
+  assert.equal(result.code, 2);
+  assert.equal(result.json.code, 'binary_outdated');
+  assert.match(result.json.error, /version 0\.1\.0; claiming by email needs 0\.2\.0 or newer/);
+  assert.match(result.json.hint, /SOUNDROO_CLOUD_BIN/);
+  assert.deepEqual(stub.calls().map(c => c.command), ['version']);
+});
+
 test('an update stops before publishing when this computer cannot update the shared collection', { skip }, async () => {
   const collection = { id: '01JCOLLECTION0000000000001', title: 'Night Trains', visibility: 'unlisted', artist: '@amber-orchard', tracks: [{ localId: 'night-train', visibility: 'unlisted', access: 'open' }] };
   async function sharedLibrary() {

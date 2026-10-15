@@ -115,6 +115,18 @@ function identityError(kind, { origin, sharedAs, key, cause }) {
   });
 }
 
+// An unclaimed artist page is full. The way on is claiming that page, never a
+// new guest artist: the person confirms one email (claim --email) or opens the
+// saved claim link, and this computer's key keeps publishing to the same music.
+async function claimRequired(cloud, cause) {
+  const key = await cloud(['auth', 'status']).then(status => status.key ?? null).catch(() => null);
+  const page = key?.artist?.handle ? `@${key.artist.handle}` : 'your artist page';
+  return new ShareError(cause.message, {
+    code: 'claim_required', exitCode: 4, status: cause.status, serviceCode: 'claim_required', claimUrl: savedClaimLink(key?.artist?.handle, key),
+    hint: `Claim ${page} to share more: run node bin/soundroo.js claim --email you@example.com with the person's email address, and they confirm the link in that email. Or they open the claim link${savedClaimLink(key?.artist?.handle, key) ? ' below' : ''} and sign in. Then share again.`,
+  });
+}
+
 // Before updating a collection this library shared: the stored key must exist
 // and the service must let it edit that collection (canEdit). A guest page
 // claimed into an account passes with that account, whatever its handle. The
@@ -214,6 +226,7 @@ export async function shareLibrary(directory, options = {}) {
     published = await cloud(['publish', '--payload', '-', '--rights-accepted', '--idempotency-key', key, ...(artist ? ['--artist', artist] : [])], { input: prepared.bytes, timeoutMs: 10 * 60_000, signal });
   } catch (error) {
     if (error.code === 'conflict') updateService(directory, origin, s => { delete s.pending; return s; });
+    if (error.code === 'claim_required' || error.serviceCode === 'claim_required') throw await claimRequired(cloud, error);
     throw error;
   }
   remember(directory, origin, published, prepared);

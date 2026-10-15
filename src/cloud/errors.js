@@ -4,8 +4,10 @@
 // 5 not found, 6 slow down.
 // claimUrl carries a saved private claim link when it is the way out of the
 // error; it goes only to the person on this computer, like a share's own.
+// serviceCode is the Soundroo service's own code (claim_required, …) when the
+// service gave one.
 export class ShareError extends Error {
-  constructor(message, { code = 'error', exitCode = 1, issues, hint, details, status, claimUrl } = {}) {
+  constructor(message, { code = 'error', exitCode = 1, issues, hint, details, status, claimUrl, serviceCode } = {}) {
     super(message);
     this.name = 'ShareError';
     this.code = code;
@@ -15,10 +17,11 @@ export class ShareError extends Error {
     if (details) this.details = details;
     if (status) this.status = status;
     if (claimUrl) this.claimUrl = claimUrl;
+    if (serviceCode) this.serviceCode = serviceCode;
   }
 
   toJSON() {
-    return { error: this.message, code: this.code, exitCode: this.exitCode, ...(this.status ? { status: this.status } : {}), ...(this.issues ? { issues: this.issues } : {}), ...(this.hint ? { hint: this.hint } : {}), ...(this.claimUrl ? { claimUrl: this.claimUrl } : {}) };
+    return { error: this.message, code: this.code, exitCode: this.exitCode, ...(this.status ? { status: this.status } : {}), ...(this.serviceCode ? { serviceCode: this.serviceCode } : {}), ...(this.issues ? { issues: this.issues } : {}), ...(this.hint ? { hint: this.hint } : {}), ...(this.claimUrl ? { claimUrl: this.claimUrl } : {}) };
   }
 }
 

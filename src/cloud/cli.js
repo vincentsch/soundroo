@@ -4,11 +4,11 @@
 import { libraryPath } from '../project.js';
 import { shareLibrary, shareStatus, serviceOrigin, connect } from './share.js';
 import { importTrack } from './importer.js';
-import { runCloud, cloudResult } from './runner.js';
+import { runCloud, cloudResult, checkProtocol } from './runner.js';
 import { ShareError, asShareError } from './errors.js';
 import { MANIFEST_PATH } from './binary.js';
 
-export const NETWORK_COMMANDS = new Set(['share', 'publish', 'login', 'logout', 'whoami', 'claim-link', 'import', 'cloud']);
+export const NETWORK_COMMANDS = new Set(['share', 'publish', 'login', 'logout', 'whoami', 'claim', 'claim-link', 'import', 'cloud']);
 export const NETWORK_FLAGS = ['dry-run', 'rights-accepted', 'no-wait', 'force', 'confirm', 'start', 'wait', 'local-only', 'refresh', 'no-guest'];
 
 const time = seconds => (Number.isFinite(seconds) ? `${Math.floor(seconds / 60)}:${String(Math.round(seconds % 60)).padStart(2, '0')}` : '');
@@ -75,11 +75,37 @@ function number(value, name) {
   return n;
 }
 
+// The first soundroo-cloud release with claim --email.
+export const CLAIM_EMAIL_VERSION = '0.2.0';
+
+const versionParts = version => String(version ?? '').split(/[-+]/)[0].split('.').map(Number);
+export function atLeast(version, minimum) {
+  const have = versionParts(version), need = versionParts(minimum);
+  for (let i = 0; i < 3; i++) {
+    if ((have[i] || 0) !== (need[i] || 0)) return (have[i] || 0) > (need[i] || 0);
+  }
+  return true;
+}
+
+// A command that needs a newer soundroo-cloud than the one at hand explains
+// how to get it instead of failing with "unknown command".
+async function requireVersion(binary, minimum, { origin, env, what }) {
+  const info = await checkProtocol(binary.path, { env });
+  if (atLeast(info.version, minimum)) return;
+  const hint = binary.source === 'env'
+    ? 'Rebuild it from cloud-cli (go build -o soundroo-cloud .), or unset SOUNDROO_CLOUD_BIN to use the build the service offers.'
+    : binary.stale
+      ? `${origin} could not be reached to update it. Try again when it is online.`
+      : `${origin} does not offer a newer build yet. Use the claim link instead: node bin/soundroo.js claim-link prints a fresh one.`;
+  throw new ShareError(`This soundroo-cloud is version ${info.version}; ${what} needs ${minimum} or newer.`, { code: 'binary_outdated', exitCode: 2, hint });
+}
+
 // Runs soundroo-cloud for a passthrough command. Human mode shares the
 // terminal (prompts, progress); JSON mode prints one JSON document.
-async function passthrough(origin, args, { json, print, dryRun, env }) {
+async function passthrough(origin, args, { json, print, dryRun, env, minVersion }) {
   const connected = await connect(origin, { env, download: !dryRun });
   if (!connected) return null;
+  if (minVersion) await requireVersion(connected.binary, minVersion.version, { origin, env, what: minVersion.what });
   const argv = ['--service', origin, ...(json ? ['--json'] : []), ...args];
   if (!json) return (await runCloud(connected.binary.path, argv, { env, inherit: true, timeoutMs: 60 * 60_000 })).code;
   print(cloudResult(await runCloud(connected.binary.path, ['--no-prompt', ...argv], { env, timeoutMs: 60 * 60_000 })));
@@ -133,6 +159,15 @@ export async function runNetworkCommand(command, { positional = [], options = {}
     if (command === 'whoami') {
       if (options['dry-run'] === true) { print(json ? { dryRun: true, service: origin, request: { method: 'GET', path: '/api/v1/me' }, changes: 'none' } : `DRY RUN: would ask ${origin} which artist the stored key publishes as, with its collections.\nNo changes were made.`); return 0; }
       return await passthrough(origin, ['me'], { json, print, env });
+    }
+    if (command === 'claim') {
+      const email = String(options.email ?? positional[0] ?? '').trim().toLowerCase();
+      if (!email || !email.includes('@') || /\s/.test(email)) throw new ShareError('Name the email address that should own the artist page: node bin/soundroo.js claim --email you@example.com', { code: 'usage' });
+      if (options['dry-run'] === true) {
+        print(json ? { dryRun: true, service: origin, request: { method: 'POST', path: '/api/v1/claim-email', body: { email } }, changes: 'none' } : `DRY RUN: would ask ${origin} to email ${email} a link that claims the guest artist page this computer publishes as.\nNo changes were made.`);
+        return 0;
+      }
+      return await passthrough(origin, ['claim', '--email', email], { json, print, env, minVersion: { version: CLAIM_EMAIL_VERSION, what: 'claiming by email' } });
     }
     if (command === 'claim-link') {
       const code = await passthrough(origin, ['claim-link', ...flagArgs(options, ['dry-run'])], { json, print, env, dryRun: options['dry-run'] === true });
