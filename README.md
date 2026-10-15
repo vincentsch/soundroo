@@ -1,34 +1,108 @@
-# Soundroo
+<p align="center">
+  <a href="https://soundroo.com">
+    <img src="web/favicon.svg" alt="" width="72">
+  </a>
+</p>
 
-**Music made with your coding agent.**
+<h1 align="center">Soundroo</h1>
 
-Describe a collection. Your agent composes the music, renders it locally and opens a studio where you can listen, keep favorites and shape the result. Every note stays editable.
+<p align="center">
+  <b>Music made by your AI agent.</b><br>
+  Free and open source. Composing, rendering and playback run on your computer.
+</p>
 
-## Make your music
+<p align="center">
+  <a href="https://soundroo.com">Website</a> &nbsp;·&nbsp;
+  <a href="https://soundroo.com/docs">Docs</a> &nbsp;·&nbsp;
+  <a href="https://soundroo.com/make/custom">Prompt builder</a> &nbsp;·&nbsp;
+  <a href="AGENTS.md">AGENTS.md</a>
+</p>
 
-Give this prompt to Claude Code, Codex or another coding agent with local shell access:
+![The Soundroo music player with the Turn It Up example collection](docs/studio.jpg)
+
+## Make a track
+
+> [!TIP]
+> **Give your AI agent this repo and say what you'd like to hear.**
+> It works with Claude Code, Codex and other coding agents that can run
+> commands. ChatGPT and Claude use the Soundroo connector instead.
+
+Copy this into your agent and put your idea in place of the brackets:
 
 ```text
-Make me a collection of ten original music tracks about [your idea].
-Use Soundroo: clone https://github.com/vincentsch/soundroo,
-read its AGENTS.md and follow the steps.
-Give the pieces distinct melodies and arrangements, then open the local
-studio so I can listen. Keep the scores so we can change the music later.
+Make me a track: [what it should sound like, or "surprise me"].
+Use Soundroo for it. If you have Soundroo tools, use them. If you can run commands, clone https://github.com/vincentsch/soundroo, read its AGENTS.md and follow the steps. If you can't do either, send me to https://soundroo.com/connect
 ```
 
-Try a guitar-driven rock record, big-hook modern pop, disco and funk, a late-night breakbeat set, or grooves for a focused workday. The agent is the composer; Soundroo provides the instruments, rendering and listening studio. Your coding agent is a separate tool with its own requirements and prices.
+A few words are enough, like "a fast funk track for a summer road trip" or
+"something that sounds like an 80s arcade game". The agent sets up Soundroo,
+writes the track and opens a small music player in your browser. You listen,
+tell it what to change, and ask for more when you like it.
 
-## Listen first
+Unless you ask for something calm, Soundroo makes lively music: drums and bass
+from the first bars, a hook early on and a chorus that lifts.
 
-![Soundroo's local listening studio showing Turn It Up](docs/studio.jpg)
+## How does it work?
 
-The studio gives your music a home: original record sleeves, a collection view, track lists, favorites, a queue and a persistent player. Open a track to see its sections, leave notes at particular moments or compare rendered versions. A full-screen listening view responds to the playing audio. Search, shuffle, repeat, keyboard controls and light/dark themes are built in.
+The agent writes the music as a score, a small JSON file with the tempo,
+the instruments and the notes. Drum patterns look like `X...x...X...x...`, and
+melodies like `G4/.5 Bb4 C5/1`. Soundroo's engine reads the score and
+synthesizes each sound from scratch, then mixes the parts into a stereo track.
 
-When you want to go deeper, open the mixer. Change instrument levels, pan, mute and solo, then save the mix as a new rendered version. Or simply tell your agent, “Keep the melody, make the drums softer, and give the middle section more room.” Your feedback and musical requests stay in the local library.
+- **Instruments.** 28 kinds, all made in code: clean and overdriven electric
+  guitars, electric and synth basses, rock and electronic drums, electric
+  piano, organ, analog and FM synthesizers, pads, strings, bells and marimba.
+- **Words.** Short spoken phrases can become rhythmic chops, tape and grain
+  textures or a vocoder robot voice. The words come from
+  [Kokoro](https://huggingface.co/hexgrad/Kokoro-82M), a small voice model that
+  runs on your computer. It speaks, it doesn't sing.
+- **Checks.** An agent can't hear music, so Soundroo checks each render for
+  clipping, silence, squashed levels and big jumps in loudness. Your ears
+  decide the rest.
+- **Editing.** Because the track is a score, the agent can change one part and
+  keep the others. "Keep the melody, make the drums softer" works.
 
-## Hear the examples
+None of this needs an account, an API key, music software or a graphics card,
+and none of it leaves your computer. Your AI agent is a separate service with
+its own terms and prices.
 
-You need **Node.js 22 or newer**. The core works without installing any packages, music software, speech model or GPU.
+## The music player
+
+The player gives your music a home: generated cover art, collections, a queue,
+favorites and a full-screen view that moves with the music. Open a track to
+see its sections, leave notes at a moment in the track or compare versions.
+The mixer changes levels, panning, mute and solo and saves the mix as a new
+version. Keyboard controls and light and dark themes are built in.
+
+You can download each track as WAV, the editable score, MIDI for other music
+programs, separate instrument tracks (stems) and a small listening page that
+works offline.
+
+## Share it on soundroo.com
+
+When your music is ready, the agent asks whether to put it on
+[soundroo.com](https://soundroo.com). If you say yes, it sends the score, and
+soundroo.com renders the audio with the same engine. You get links that play
+in any browser, to send to friends.
+
+The first share needs no account. Soundroo makes an artist page for you with a
+generated name, and its music is unlisted. That page holds up to 10 tracks. To
+keep it and list your music publicly, give the agent your email address. It
+runs `node bin/soundroo.js claim --email you@example.com`, and you confirm the
+link in the email. [Sharing](docs/sharing.md) explains what is sent and every
+option.
+
+## ChatGPT and Claude
+
+Chat apps can't run this toolkit, so soundroo.com has a connector for them, a
+remote MCP server. Add it once and sign in, then paste the same prompt into a
+chat. You get a link to a private preview of your track.
+[soundroo.com/connect](https://soundroo.com/connect) shows the steps.
+
+## Install it yourself
+
+You need [Node.js](https://nodejs.org) 22 or newer. I develop Soundroo on
+Linux, and its tests run on Linux, macOS and Windows.
 
 ```bash
 git clone https://github.com/vincentsch/soundroo.git
@@ -36,74 +110,47 @@ cd soundroo
 node bin/soundroo.js start
 ```
 
-Open the local URL printed in the terminal. The first start prepares **Turn It Up**, ten original example pieces spanning guitar-led rock and roll, garage rock, modern pop, dance and focused grooves. Riffs, hooks, chorus lifts and drum fills give the pieces different identities. The studio labels them as examples; your agent creates a personal collection from your own brief.
-
-The softer **The Open Window** collection is also available:
-
-```bash
-node bin/soundroo.js start library/open-window --collection open-window
-```
-
-Existing libraries keep their music. To hear the new set from an existing checkout:
-
-```bash
-node bin/soundroo.js start library/turn-it-up
-```
-
-Use a new library folder to try another example collection.
-
-The usual studio address is `http://127.0.0.1:4317`, so browser preferences and your listening position survive restarts. If that port is occupied, Soundroo prints another local address. Use `--port NUMBER` to choose one.
-
-The repository is private, so cloning currently requires access.
-
-## Words can become instruments
-
-Soundroo can turn short spoken phrases into rhythmic chops, tape effects, granular textures and vocoder hooks. The example voice pieces work immediately with bundled short phrases. For your own words, the optional [Kokoro](https://huggingface.co/hexgrad/Kokoro-82M) speech model runs on your computer.
-
-```bash
-npm install --no-save --package-lock=false kokoro-js@1.2.1 @huggingface/transformers@3.8.1
-node bin/soundroo.js voice create "We are made of light" --out library/assets/phrase.wav
-node bin/soundroo.js voice process library/assets/phrase.wav --effect vocoder --pitch 60 --out library/assets/robot.wav
-```
-
-A score can also name its words directly in a speech recipe; its first render speaks and caches them. The first speech generation downloads the model once. Instrumental music and effects on existing speech need no model download. These are processed speech and musical textures; Kokoro is not a natural singing model.
-
-## Keep the music
-
-Download a rendered WAV, editable score, MIDI, instrument stems or a portable listening bundle from the studio. The bundle opens as a local web page with its audio and cover beside it. It uploads nothing.
-
-MIDI keeps notes and timing with instrument mappings, rather than the exact synthesized sounds or spoken samples. Stems contain instrument buses before shared master processing and may not sum exactly to the mastered mix.
-
-## Share it, if you like
-
-Sharing is optional and nothing leaves your computer until you ask. When you want links to send around, tell your agent to publish the collection, or press **Share on Soundroo** in the studio:
-
-```bash
-node bin/soundroo.js share --library library/my-music --dry-run
-node bin/soundroo.js share --library library/my-music --rights-accepted
-```
-
-soundroo.com renders the audio from your scores with an official Soundroo engine, so only scores, mix settings and the collection title are sent. The first share needs no account: it creates a guest artist page and returns a private claim link that moves the music to your own account later. Open tracks can be imported, remixed and shared again with credit. [Sharing](docs/sharing.md) explains what is sent, the choices and the commands.
-
-## Compose and extend
-
-Soundroo uses ordinary JSON scores and small JavaScript composition helpers. Named patterns and clips let an agent develop a motif without rewriting each note, and score version 2 writes drum steps and melodic lines as short strings. Its 28 local instrument types include clean/crunch guitar, picked electric bass, rock drums and cymbals, electric piano, analog/FM leads, mallets, pads and processed speech. [The composing guide](docs/composing.md) includes a runnable example and the score format. [Musical directions](docs/musical-directions.md) covers riffs, hooks and grooves. [AGENTS.md](AGENTS.md) gives the complete agent workflow. [The headless engine](docs/headless.md) validates, renders and identifies scores for servers and other tools.
+Open the address it prints, usually `http://127.0.0.1:4317`. The first start
+renders **Turn It Up**, ten example tracks from rock and roll to dance-pop,
+UK garage and hyperpop. Then start your agent in the `soundroo` folder and ask
+for a track. It follows [AGENTS.md](AGENTS.md).
 
 Useful commands:
 
 ```bash
 node bin/soundroo.js --help
 node bin/soundroo.js doctor
-node bin/soundroo.js catalog --json
+node bin/soundroo.js catalog
 node bin/soundroo.js init library/my-music --title "After Hours"
 node bin/soundroo.js validate my-track.json --json
 node bin/soundroo.js add my-track.json --library library/my-music
-node bin/soundroo.js render --all --library library/my-music --json
+node bin/soundroo.js render --all --library library/my-music
 node bin/soundroo.js start library/my-music
 ```
 
-Rendering checks find malformed scores, clipping, invalid samples and unexpected silence. They cannot judge musical taste. The default sound palette emphasizes electronic and synthesized instruments; piano and strings are approximations. Listen and revise the parts that matter to you.
+For spoken words, install the optional voice model once:
 
-## License
+```bash
+npm install --no-save --package-lock=false kokoro-js@1.2.1 @huggingface/transformers@3.8.1
+node bin/soundroo.js voice create "We are made of light" --out library/assets/phrase.wav
+```
 
-MIT. Copyright (c) 2026 Vincent Schmalbach. Dependency and optional speech-model licenses are in [Third party notices](THIRD_PARTY_NOTICES.md).
+The first spoken render downloads the model once. Instrumental music never needs it.
+
+## Write music yourself
+
+[The composing guide](docs/composing.md) has the score format and a complete
+example track. [Musical directions](docs/musical-directions.md) and
+[Grooves](docs/grooves.md) cover hooks, sections and drum and bass patterns
+for many styles. [The headless engine](docs/headless.md) validates and renders
+scores for servers and other tools.
+
+## Credits and license
+
+Soundroo is MIT licensed. Copyright (c) 2026 Vincent Schmalbach. Spoken words
+come from [Kokoro](https://huggingface.co/hexgrad/Kokoro-82M) through
+[kokoro-js](https://github.com/hexgrad/kokoro) and
+[Transformers.js](https://github.com/huggingface/transformers.js), both
+optional. The sharing helper is built with
+[rungrad](https://github.com/vincentsch/rungrad). Licenses of the optional
+parts are in [Third party notices](THIRD_PARTY_NOTICES.md).
