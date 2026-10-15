@@ -55,5 +55,4 @@ For the user's own words, install the optional local runtime from the Soundroo f
 
 ## Development
 
-
 Use small topical commits. Run `npm run check` and `npm test` after relevant changes. Verify complete renders and browser playback, persistence and exports for changes affecting those flows. Keep dependencies minimal and use ordinary Node/browser mechanisms. The application must not silently invoke models or send musical data to remote services. Fix observed real failures; reviews end when no material defect remains.
