@@ -67,6 +67,16 @@ var (
 		RequiresAuth: true,
 		Mutates:      true,
 	}
+	claimSpec = rungrad.CommandSpec{
+		Path:         "claim",
+		Summary:      "Claim your guest artist page by email: the person only confirms the link",
+		GroupID:      "account",
+		OutputModes:  []string{rungrad.OutputModeHuman, rungrad.OutputModeJSON},
+		Examples:     []string{"soundroo-cloud claim --email you@example.com", "soundroo-cloud claim --email you@example.com --json"},
+		Related:      []string{"soundroo-cloud claim-link", "soundroo-cloud auth status"},
+		RequiresAuth: true,
+		Mutates:      true,
+	}
 	logoutSpec = rungrad.CommandSpec{
 		Path:         "logout",
 		Summary:      "Revoke and forget the key stored for a service",
@@ -81,13 +91,13 @@ var (
 )
 
 func (accountModule) Catalog() []rungrad.CommandSpec {
-	return []rungrad.CommandSpec{authSpec, authStatusSpec, meSpec, loginSpec, claimLinkSpec, logoutSpec}
+	return []rungrad.CommandSpec{authSpec, authStatusSpec, meSpec, loginSpec, claimLinkSpec, claimSpec, logoutSpec}
 }
 
 func (m accountModule) Commands() []*rungrad.Command {
 	auth := &rungrad.Command{Use: "auth", Short: authSpec.Summary, Examples: authSpec.Examples, Related: authSpec.Related, GroupID: "account"}
 	auth.AddCommand(m.authStatus())
-	return []*rungrad.Command{auth, m.me(), m.login(), m.claimLink(), m.logout()}
+	return []*rungrad.Command{auth, m.me(), m.login(), m.claimLink(), m.claim(), m.logout()}
 }
 
 type keyStatus struct {
@@ -580,6 +590,101 @@ publicly. Each link works once and expires after 30 days. Keep it private.`,
 			result := claimResult{Service: o, ClaimURL: answer.ClaimURL, ExpiresAt: answer.ExpiresAt}
 			return f.WriteResult(result, func(w io.Writer) {
 				fmt.Fprintf(w, "Open this link and sign in to claim your artist page (keep it private):\n  %s\n", result.ClaimURL)
+			})
+		},
+	}
+}
+
+// --- claim by email ---------------------------------------------------------------
+
+type claimEmailResult struct {
+	Service          string        `json:"service"`
+	Sent             bool          `json:"sent"`
+	Email            string        `json:"email"`
+	Artist           *store.Artist `json:"artist,omitempty"`
+	ExpiresInMinutes int           `json:"expiresInMinutes,omitempty"`
+}
+
+func (m accountModule) claim() *rungrad.Command {
+	return &rungrad.Command{
+		Use:   "claim",
+		Short: claimSpec.Summary,
+		Long: `Ask the service to email a link that claims the guest artist page your key
+publishes as. The person opens the email and confirms once: a new address
+becomes a Soundroo account that keeps the page, its music and its links; an
+address that already has an account receives the music on its own page.
+
+Throwaway inbox services are refused. The link works once and expires after
+an hour. This key keeps publishing to the same music afterwards.`,
+		Examples:       claimSpec.Examples,
+		Related:        claimSpec.Related,
+		OutputModes:    claimSpec.OutputModes,
+		GroupID:        "account",
+		RequiresAuth:   true,
+		AuthResolution: rungrad.AuthResolutionHandler,
+		Mutates:        true,
+		Configure: func(cmd *cobra.Command) {
+			cmd.Flags().String("email", "", "Email address that should own the artist page")
+		},
+		Run: func(f *rungrad.Factory, cmd *cobra.Command, _ []string) error {
+			o, err := origin(f)
+			if err != nil {
+				return err
+			}
+			email, _ := cmd.Flags().GetString("email")
+			email = strings.ToLower(strings.TrimSpace(email))
+			if email == "" || !strings.Contains(email, "@") || strings.ContainsAny(email, " \t\r\n") {
+				return &cloud.Error{Code: "usage", Exit: cloud.ExitUsage, Message: "Name the email address that should own the artist page: claim --email you@example.com"}
+			}
+			if f.DryRun() {
+				return f.WritePreview(output.DryRunPreview{Method: "POST", Path: "/api/v1/claim-email", Body: []output.Field{{Name: "service", Value: o}, {Name: "email", Value: email}}})
+			}
+			token, source, err := m.e.requireKey(f, o)
+			if err != nil {
+				return err
+			}
+			st := m.e.store(f, o)
+			c := m.e.client(f, o, token)
+			body, _ := json.Marshal(map[string]string{"email": email})
+			var answer struct {
+				Sent             bool         `json:"sent"`
+				Email            string       `json:"email"`
+				Artist           cloud.Artist `json:"artist"`
+				ExpiresInMinutes int          `json:"expiresInMinutes"`
+			}
+			if _, err := c.JSON(runContext(cmd), cloud.Request{Method: "POST", Path: "/claim-email", Body: body}, &answer); err != nil {
+				var apiErr *cloud.Error
+				if errors.As(err, &apiErr) {
+					switch {
+					case apiErr.ServiceCode == "already_claimed" || apiErr.Status == 409:
+						if source == store.SourceFile {
+							_ = st.UpdateAccount(func(a *store.Account) { a.ClaimURL, a.Claimed = "", true })
+						}
+						apiErr.Code, apiErr.Message, apiErr.Hint = "already_claimed", "This artist page is already claimed.", "Run login to manage the music with your account."
+					case apiErr.Status == 404:
+						apiErr.Code, apiErr.Message = "claim_email_unavailable", fmt.Sprintf("%s does not offer claiming by email yet.", o)
+						apiErr.Hint = "Open the claim link instead: auth status shows it, and claim-link makes a fresh one."
+					}
+				}
+				return explainKeyFailure(err, source, "")
+			}
+			if answer.Email == "" {
+				answer.Email = email
+			}
+			result := claimEmailResult{Service: o, Sent: true, Email: answer.Email, ExpiresInMinutes: answer.ExpiresInMinutes}
+			if answer.Artist.Handle != "" {
+				artist := storeArtist(answer.Artist)
+				result.Artist = &artist
+			}
+			return f.WriteResult(result, func(w io.Writer) {
+				page := "your artist page"
+				if result.Artist != nil {
+					page = "@" + result.Artist.Handle
+				}
+				fmt.Fprintf(w, "Sent a link to %s. Open the email and confirm to keep %s and its music.\n", result.Email, page)
+				if result.ExpiresInMinutes > 0 {
+					fmt.Fprintf(w, "The link works once and expires in %d minutes.\n", result.ExpiresInMinutes)
+				}
 			})
 		},
 	}

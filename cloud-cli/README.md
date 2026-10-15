@@ -24,6 +24,7 @@ The tests run every command against a stand-in service with the routes, resource
 | `me` | `GET /api/v1/me` |
 | `login [--start \| --wait]` | Device login: `POST /api/v1/device/code`, then polls `POST /api/v1/device/token` until approved on `/link` or the code expires. Prints the link; never opens a browser. |
 | `claim-link` | `POST /api/v1/claim-links`: a fresh claim link for a guest page. |
+| `claim --email ADDRESS` | `POST /api/v1/claim-email`: the service emails that address a link that claims the guest page; the person confirms once. Needs 0.2.0 or newer. |
 | `logout --confirm [--local-only]` | `DELETE /api/v1/auth/token`, then removes this origin's stored key. |
 | `track show \| update \| delete`, `collection show \| update` | Read and manage shared music. Updates and deletes need an account key; deletes need `--confirm`. `collection show` reports `canEdit`: whether the key it sent owns the collection, which the toolkit checks before updating a shared library. |
 | `score ID` | `GET /api/v1/tracks/{id}/score`, kept as the service's raw JSON. |
@@ -40,10 +41,10 @@ A service offers builds at `/downloads/cli/manifest.json`:
 ```json
 {
   "name": "soundroo-cloud",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "protocol": 1,
   "platforms": {
-    "linux-amd64": { "url": "0.1.0/soundroo-cloud_0.1.0_linux_amd64", "sha256": "…", "size": 9212039 }
+    "linux-amd64": { "url": "0.2.0/soundroo-cloud_0.2.0_linux_amd64", "sha256": "…", "size": 9212039 }
   }
 }
 ```

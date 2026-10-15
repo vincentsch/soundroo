@@ -291,6 +291,20 @@ func (f *fakeService) authed(w http.ResponseWriter, r *http.Request, path string
 			return
 		}
 		writeJSON(w, 201, map[string]any{"claimUrl": f.URL() + "/claim/" + strings.Repeat("n", 64), "expiresAt": "2026-11-12T12:00:00+00:00"})
+	case r.Method == "POST" && path == "/claim-email":
+		if u.Status != "guest" {
+			writeJSON(w, 409, map[string]any{"error": map[string]any{"code": "already_claimed", "message": "This artist page is already claimed.", "issues": []any{}}})
+			return
+		}
+		var in struct {
+			Email string `json:"email"`
+		}
+		_ = json.Unmarshal(body, &in)
+		if strings.HasSuffix(in.Email, "@mailinator.com") {
+			writeJSON(w, 422, map[string]any{"error": map[string]any{"code": "invalid_request", "message": "Please use an email address you keep.", "issues": []any{map[string]string{"path": "email", "message": "Please use an email address you keep."}}}, "message": "Please use an email address you keep.", "errors": map[string][]string{"email": {"Please use an email address you keep."}}})
+			return
+		}
+		writeJSON(w, 202, map[string]any{"sent": true, "email": in.Email, "artist": f.artist(u.Handle, u.Status), "expiresInMinutes": 60})
 	case r.Method == "GET" && path == "/me":
 		if !u.can("publish") {
 			message(w, 403, "This key does not have permission for that action.")

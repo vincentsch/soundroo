@@ -18,7 +18,7 @@ import (
 
 // Version is the soundroo-cloud release. Protocol is the JSON contract the
 // Soundroo toolkit relies on; it changes only for incompatible output changes.
-var Version = "0.1.0"
+var Version = "0.2.0"
 
 const Protocol = 1
 

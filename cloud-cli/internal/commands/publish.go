@@ -305,7 +305,13 @@ func explainKeyFailure(err error, source, kind string) error {
 			apiErr.Hint = "If it belonged to a guest artist page that is not claimed yet, open that page's claim link while signed in to your Soundroo account (auth status shows it). Then run login and try again."
 		}
 	case cloud.ExitForbidden:
-		if kind == store.KindGuest && apiErr.Hint == "" {
+		if apiErr.ServiceCode == "claim_required" {
+			// Never a new guest artist: the page this key publishes as is the one to claim.
+			apiErr.Code = "claim_required"
+			if apiErr.Hint == "" {
+				apiErr.Hint = "Claim the page by email with claim --email you@example.com, or open its claim link (auth status shows it). Then share again."
+			}
+		} else if kind == store.KindGuest && apiErr.Hint == "" {
 			apiErr.Hint = "Guest keys can publish. Claim your artist page or log in with an account to edit or delete music."
 		}
 	}

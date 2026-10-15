@@ -667,6 +667,68 @@ func TestClaimLinkRefreshesTheGuestLink(t *testing.T) {
 	}
 }
 
+func TestClaimEmailsTheLinkThatKeepsTheGuestPage(t *testing.T) {
+	svc := newFakeService(t)
+	h := newHarness(t)
+	if res := h.run("claim", "--email", "Mara@Example.test", "--dry-run", "--json", "--service", svc.URL()); res.Exit != 0 || len(svc.calls()) != 0 || !strings.Contains(res.Stdout, "/api/v1/claim-email") || !strings.Contains(res.Stdout, "mara@example.test") {
+		t.Fatalf("dry run: %d %s %v", res.Exit, res.Stdout, svc.calls())
+	}
+	if res := h.run("claim", "--service", svc.URL()); res.Exit != 1 || !strings.Contains(res.Stderr, "--email") {
+		t.Fatalf("without an address: %d %s", res.Exit, res.Stderr)
+	}
+	if res := h.run("claim", "--email", "mara@example.test", "--service", svc.URL()); res.Exit != 3 {
+		t.Fatalf("without a key: %d", res.Exit)
+	}
+	path := writePayload(t, samplePayload)
+	if res := h.run("publish", "--payload", path, "--rights-accepted", "--service", svc.URL()); res.Exit != 0 {
+		t.Fatal(res.Stderr)
+	}
+	res := h.run("claim", "--email", "Mara@Example.test", "--json", "--service", svc.URL())
+	out := decodeJSON(t, res.Stdout)
+	if res.Exit != 0 || out["sent"] != true || out["email"] != "mara@example.test" || out["expiresInMinutes"] != float64(60) || out["artist"].(map[string]any)["handle"] != "amber-orchard-g1" {
+		t.Fatalf("claim: %d %s %s", res.Exit, res.Stdout, res.Stderr)
+	}
+	calls := svc.calls()
+	last := calls[len(calls)-1]
+	if last.Path != "/api/v1/claim-email" || string(last.Body) != `{"email":"mara@example.test"}` || !strings.HasPrefix(last.Auth, "Bearer 1|guestsecret") {
+		t.Fatalf("request: %+v", last)
+	}
+	human := h.run("claim", "--email", "mara@example.test", "--service", svc.URL())
+	if human.Exit != 0 || !strings.Contains(human.Stdout, "Sent a link to mara@example.test") || !strings.Contains(human.Stdout, "@amber-orchard-g1") || !strings.Contains(human.Stdout, "60 minutes") {
+		t.Fatalf("human output: %s", human.Stdout)
+	}
+	refused := h.run("claim", "--email", "temp@mailinator.com", "--json", "--service", svc.URL())
+	if body := decodeJSON(t, refused.Stderr); refused.Exit != 1 || body["code"] != "validation_failed" || len(body["issues"].([]any)) == 0 {
+		t.Fatalf("throwaway inbox: %d %s", refused.Exit, refused.Stderr)
+	}
+	svc.addToken("4|claimedsecret00000000000000000000", "mara", "active", "publish", "manage")
+	h.env[TokenEnv] = "4|claimedsecret00000000000000000000"
+	res = h.run("claim", "--email", "mara@example.test", "--json", "--service", svc.URL())
+	if res.Exit != 1 || decodeJSON(t, res.Stderr)["code"] != "already_claimed" {
+		t.Fatalf("claimed page: %d %s", res.Exit, res.Stderr)
+	}
+}
+
+func TestAFullUnclaimedPageAsksForAClaimInsteadOfAnotherGuest(t *testing.T) {
+	svc := newFakeService(t)
+	h := newHarness(t)
+	path := writePayload(t, samplePayload)
+	if res := h.run("publish", "--payload", path, "--rights-accepted", "--service", svc.URL()); res.Exit != 0 {
+		t.Fatal(res.Stderr)
+	}
+	svc.releaseError = func(_ *httpRequest, _ []byte) (int, string) {
+		return 403, `{"error":{"code":"claim_required","message":"An unclaimed artist page holds up to 10 tracks, and this one has 10.","issues":[]},"message":"An unclaimed artist page holds up to 10 tracks, and this one has 10."}`
+	}
+	res := h.run("publish", "--payload", writePayload(t, strings.Replace(samplePayload, "night-train", "another-train", 1)), "--rights-accepted", "--json", "--service", svc.URL())
+	body := decodeJSON(t, res.Stderr)
+	if res.Exit != 4 || body["code"] != "claim_required" || body["service_code"] != "claim_required" || !strings.Contains(body["hint"].(string), "claim --email") {
+		t.Fatalf("claim required: %d %s", res.Exit, res.Stderr)
+	}
+	if svc.count("POST", "/api/v1/guest-keys") != 1 {
+		t.Fatal("a full guest page must never lead to another guest artist")
+	}
+}
+
 func TestCollectionShowSaysWhetherTheKeyCanEdit(t *testing.T) {
 	svc := newFakeService(t)
 	svc.addToken("6|ownersecret0000000000000000000000", "mara", "active", "publish", "manage")
