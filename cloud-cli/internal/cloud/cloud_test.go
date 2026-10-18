@@ -52,6 +52,10 @@ func TestErrorBodiesInEveryServiceShape(t *testing.T) {
 	if len(both.Issues) != 1 || both.Issues[0].Path != "email" {
 		t.Fatalf("the same problem in both shapes is reported once: %+v", both.Issues)
 	}
+	emptyList := statusError(403, []byte(`{"error":{"code":"claim_required","message":"An unclaimed artist page holds up to 10 tracks.","issues":[]},"message":"An unclaimed artist page holds up to 10 tracks.","errors":[]}`), 0)
+	if emptyList.ServiceCode != "claim_required" || emptyList.Message != "An unclaimed artist page holds up to 10 tracks." {
+		t.Fatalf("an empty errors list must not hide the message: %+v", emptyList)
+	}
 	device := statusError(400, []byte(`{"error":"authorization_pending","error_description":"Waiting for approval."}`), 0)
 	if device.ServiceCode != "authorization_pending" || device.Message != "Waiting for approval." {
 		t.Fatalf("device error: %+v", device)

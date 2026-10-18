@@ -71,10 +71,10 @@ func Errorf(code string, exit int, format string, args ...any) *Error {
 // errorBody accepts Laravel's {message, errors} and the application's
 // {error: {code, message, issues}} and {error: "text"} shapes.
 type errorBody struct {
-	Message     string                     `json:"message"`
-	Description string                     `json:"error_description"`
-	Errors      map[string]json.RawMessage `json:"errors"`
-	Error       json.RawMessage            `json:"error"`
+	Message     string          `json:"message"`
+	Description string          `json:"error_description"`
+	Errors      json.RawMessage `json:"errors"`
+	Error       json.RawMessage `json:"error"`
 }
 
 var slugPattern = regexp.MustCompile(`^[a-z][a-z0-9_.-]{1,63}$`)
@@ -112,16 +112,20 @@ func parseErrorBody(body []byte) (message, code string, issues []Issue) {
 			issues = append(issues, structured.Issues...)
 		}
 	}
-	paths := make([]string, 0, len(parsed.Errors))
-	for path := range parsed.Errors {
+	// Some services send an empty errors list as [] instead of {}; only an
+	// object carries field problems.
+	fields := map[string]json.RawMessage{}
+	_ = json.Unmarshal(parsed.Errors, &fields)
+	paths := make([]string, 0, len(fields))
+	for path := range fields {
 		paths = append(paths, path)
 	}
 	sort.Strings(paths)
 	for _, path := range paths {
 		var list []string
-		if json.Unmarshal(parsed.Errors[path], &list) != nil {
+		if json.Unmarshal(fields[path], &list) != nil {
 			var one string
-			if json.Unmarshal(parsed.Errors[path], &one) == nil {
+			if json.Unmarshal(fields[path], &one) == nil {
 				list = []string{one}
 			}
 		}
