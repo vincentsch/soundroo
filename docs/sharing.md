@@ -68,7 +68,7 @@ soundroo.com emails a link that works once and expires after an hour. Pressing i
 
 The first share's answer also includes a **claim link**. It does the same thing in a browser: open it and sign in with Google, GitHub or an email link. Keep it private, because whoever opens it can claim the page. It works once and expires after 30 days; `node bin/soundroo.js claim-link` asks for a fresh one.
 
-Editing or deleting shared tracks from the command line needs an account key. After claiming, connect this computer:
+The key on this computer keeps working after the claim, so you can share again right away. Only editing or deleting shared tracks from the command line needs an account key. For that, connect this computer:
 
 ```bash
 node bin/soundroo.js login

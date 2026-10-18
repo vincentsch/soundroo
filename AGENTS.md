@@ -87,7 +87,7 @@ When they say yes:
 3. Give them the collection link and the track links. The tracks play once soundroo.com has rendered them, usually within a minute or two.
 4. Offer to keep the page: "If you give me your email address, I'll send you a link. Confirm it and the artist page is yours, so you can list your music on Soundroo and share more than 10 tracks." If they give one, run `node bin/soundroo.js claim --email <address> --json` and tell them to open the email and press the button. It works once and expires in an hour.
 5. The share output also has a private claim link. Give it to the person and say that whoever opens it can take over the artist page, so they should keep it to themselves.
-6. Once they've confirmed the email, their music can be listed on soundroo.com. If they want that, run the share command again with `--visibility public`.
+6. Once they've confirmed the email, their music can be listed on soundroo.com. If they want that, run the share command again with `--visibility public`. The key on this computer keeps working after the claim, so sharing needs no login.
 
 An artist page without an owner holds up to 10 tracks. If sharing fails with `claim_required`, explain that and offer the email step. Never create another guest page or log out to get around it. Throwaway email addresses (Mailinator and the like) are refused.
 
@@ -130,7 +130,7 @@ This adds the exact shared score with its credit in `tracks/<id>/source.json`. C
 ## Accounts and keys
 
 - Keys live in soundroo-cloud's own configuration, never in a library. Never print, ask for or store them.
-- `node bin/soundroo.js login --start --json` returns a link and a code for the person to open; finish with `login --wait --json`. Never open a browser for them. Logging in is only needed to manage music from an account on another computer.
+- `node bin/soundroo.js login --start --json` returns a link and a code for the person to open; finish with `login --wait --json`. Never open a browser for them. Sharing never needs it, not even after a claim. Log in only to edit or delete shared tracks from the command line, or to share as an existing account from another computer.
 - Edit or delete shared music only when the person asks for that change. Preview with `--dry-run` first.
 - [docs/sharing.md](docs/sharing.md) has every sharing command, option and exit code.
 
