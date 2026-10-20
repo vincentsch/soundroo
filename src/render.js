@@ -57,7 +57,7 @@ function sustained(synth, lane, t, pitch, velocity, duration, id, tone, rng) {
 // to the synthesized ones. Drums ring out; the others follow the note length.
 const RECORDED = {
   piano: { level: 0.35 }, strings: { level: 0.12 }, brass: { level: 0.27 },
-  'electric-bass': { level: 0.76 }, 'guitar-clean': { level: 0.3 }, 'guitar-crunch': { level: 0.6 },
+  'electric-bass': { level: 0.76 }, 'guitar-clean': { level: 0.3 }, 'guitar-crunch': { level: 0.83 },
   'rock-kick': { level: 1.23, drum: true }, 'rock-snare': { level: 0.7, drum: true }, 'closed-hat': { level: 0.084, drum: true }, 'open-hat': { level: 0.14, drum: true },
   tom: { level: 0.57, drum: true }, crash: { level: 0.59, drum: true }, ride: { level: 0.42, drum: true },
 };
@@ -68,6 +68,14 @@ function recordedNote(synth, lane, part, t, pitch, velocity, duration, tone, rng
   // Palm muting shortens the note and darkens it, as a hand on the strings does.
   const mute = tone.palmMute ?? 0;
   const filter = mute > 0.05 ? { type: 'lowpass', freq: 700 + 9000 * (1 - mute) ** 2, q: 0.707 } : null;
+  if (part.instrument === 'guitar-crunch') {
+    // Overdrive keeps a fading string loud, so a distorted note fades while it is held (release sets how fast;
+    // palm muting shortens it) and is damped right after it ends; otherwise the tails of fast riffs pile up
+    // into a noisy wash. High notes are turned down, as mixes written for the earlier plucked-string guitar
+    // expect: the recordings are even across the neck.
+    const decay = Math.max(0.06, tone.release * (1 - mute * 0.88)), tilt = Math.pow(10, -0.35 * (pitch - 57) / 20);
+    return sampledNote(synth, lane, t, part.instrument, pitch, velocity, duration, rng, { level: level * tilt, decay, release: Math.min(0.25, decay * 0.18), filter });
+  }
   sampledNote(synth, lane, t, part.instrument, pitch, velocity, mute ? Math.min(duration, 0.06 + duration * (1 - mute)) : duration, rng, { level, release: (tone.release ?? 0.3) * (1 - mute * 0.8), attack: tone.attack ?? 0, doubled: tone.detune ?? 0, filter });
 }
 

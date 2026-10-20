@@ -1,2 +1,2 @@
 // The toolkit release. The engine hash is content-based and does not include it.
-export const VERSION = '0.6.0';
+export const VERSION = '0.6.1';
