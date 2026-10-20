@@ -127,7 +127,7 @@ function polyblep(t, dt) {
   return 0;
 }
 
-export const WAVES = { sine: 0, saw: 1, tri: 2, square: 3, noise: 4, pink: 5, sample: 6 };
+export const WAVES = { sine: 0, saw: 1, tri: 2, square: 3, noise: 4, pink: 5, sample: 6, string: 7 };
 
 // --- biquad (RBJ cookbook) ------------------------------------------------------------
 
@@ -509,6 +509,22 @@ export class Synth {
       L.b2 = 0;
       L.mul = L.detune ? Math.pow(2, L.detune / 1200) : 1;
       L.pos = L.start ?? 0;
+      if (L.wave === 7) {
+        const delay = Math.max(2, sr / L.freq - 0.5);
+        const length = Math.ceil(delay);
+        L.string = new Float32Array(length);
+        L.stringFraction = length - delay;
+        L.stringIndex = 0;
+        L.stringPrevious = 0;
+        let sum = 0, seed = L.rs;
+        for (let i = 0; i < length; i++) {
+          seed ^= seed << 13; seed ^= seed >>> 17; seed ^= seed << 5;
+          L.string[i] = (seed >>> 0) / 2147483648 - 1;
+          sum += L.string[i];
+        }
+        for (let i = 0; i < length; i++) L.string[i] -= sum / length;
+        L.stringLoss = Math.exp(-1 / (L.freq * (L.decay ?? 2)));
+      }
     }
     if (v.filter) {
       const f = v.filter;
@@ -665,6 +681,21 @@ export class Synth {
             pos += step;
           }
           L.pos = pos;
+          break;
+        }
+        case 7: { // fractional-delay Karplus–Strong plucked string
+          const buffer = L.string, length = buffer.length;
+          let index = L.stringIndex, previous = L.stringPrevious;
+          const fraction = L.stringFraction, loss = L.stringLoss;
+          for (let k = 0; k < cnt; k++) {
+            const next = index + 1 === length ? 0 : index + 1;
+            const value = buffer[index] * (1 - fraction) + buffer[next] * fraction;
+            buffer[index] = (value + previous) * 0.5 * loss;
+            previous = value;
+            acc[k] += value * amp[k];
+            index = next;
+          }
+          L.stringIndex = index; L.stringPrevious = previous;
           break;
         }
         default:

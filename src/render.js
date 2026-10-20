@@ -46,6 +46,14 @@ function sustained(synth, lane, t, pitch, velocity, duration, id, tone, rng) {
   if (id === 'fm-lead') v.layer({ wave: WAVES.sine, freq: f, amp: envelope(0.14), fm: { ratio: 2, depth: new Env(f * 2).set(f * 2, t).target(f * 0.18, t, 0.16) } });
   else if (id === 'organ') {
     for (const [ratio, level] of [[1, 0.09], [2, 0.045], [3, 0.025], [4, 0.014]]) if (f * ratio < synth.sr * 0.45) v.layer({ wave: WAVES.sine, freq: f * ratio, amp: envelope(level) });
+  } else if (id === 'piano') {
+    for (const [ratio, level] of [[1, 0.17], [2, 0.08], [3, 0.035], [4, 0.02]]) if (f * ratio < synth.sr * 0.45) {
+      v.layer({ wave: WAVES.sine, freq: f * ratio, amp: new Env(0).set(0, t).lin(level * velocity, t + 0.003).target(level * velocity * 0.08, t + 0.003, 0.38 / ratio).target(0, t + duration, release / 3) });
+    }
+  } else if (id === 'brass') {
+    // Detuned saws through a filter that opens on the attack and settles, like a player's breath.
+    for (const detune of [-(tone.detune ?? 10) / 2, (tone.detune ?? 10) / 2]) v.layer({ wave: WAVES.saw, freq: f, detune, amp: envelope(0.05) });
+    v.filter = { type: 'lowpass', q: 0.9, freqEnv: new Env(f).set(f * 1.2, t).exp(Math.min(f * 7, 9000), t + 0.06).target(Math.min(f * 4, 6000), t + 0.06, 0.25) };
   } else if (id === 'noise') v.layer({ wave: WAVES.pink, seed: Math.floor(rng.next() * 0xffffffff), amp: envelope(0.055), freq: 0 });
   else if (id === 'chip-lead') v.layer({ wave: WAVES.square, duty: tone.duty, freq: f, amp: envelope(0.085) });
   else if (id === 'chip-bass') v.layer({ wave: WAVES.tri, freq: f, amp: envelope(0.2) });
@@ -61,6 +69,15 @@ const RECORDED = {
   'rock-kick': { level: 1.23, drum: true }, 'rock-snare': { level: 0.7, drum: true }, 'closed-hat': { level: 0.084, drum: true }, 'open-hat': { level: 0.14, drum: true },
   tom: { level: 0.57, drum: true }, crash: { level: 0.59, drum: true }, ride: { level: 0.42, drum: true },
 };
+
+// A score renders with recorded instruments, or with every instrument synthesized as engines before 0.6.0
+// made them. Synthesized parts keep the tone defaults those instruments had then.
+export const SOUNDS = ['recorded', 'synthesized'];
+const SYNTHESIZED_DEFAULTS = {
+  piano: { brightness: 3200 }, strings: { brightness: 2600, attack: 0.35, release: 1, detune: 12 }, brass: { brightness: 3200 },
+  'guitar-clean': { brightness: 6000, palmMute: 0.1 }, 'guitar-crunch': { palmMute: 0.35 }, 'electric-bass': { brightness: 2200, release: 0.7, palmMute: 0.25 },
+};
+const toneDefault = (instrument, name, sound) => (sound === 'synthesized' ? SYNTHESIZED_DEFAULTS[instrument]?.[name] : undefined) ?? presets.get(instrument).controls[name]?.default;
 
 function recordedNote(synth, lane, part, t, pitch, velocity, duration, tone, rng) {
   const { level, drum } = RECORDED[part.instrument];
@@ -79,14 +96,14 @@ function recordedNote(synth, lane, part, t, pitch, velocity, duration, tone, rng
   sampledNote(synth, lane, t, part.instrument, pitch, velocity, mute ? Math.min(duration, 0.06 + duration * (1 - mute)) : duration, rng, { level, release: (tone.release ?? 0.3) * (1 - mute * 0.8), attack: tone.attack ?? 0, doubled: tone.detune ?? 0, filter });
 }
 
-function schedule(synth, lane, note, part, beatSeconds, rng) {
+function schedule(synth, lane, note, part, beatSeconds, rng, sound) {
   const t = note.beat * beatSeconds, duration = note.duration * beatSeconds, velocity = note.velocity;
-  const tone = Object.fromEntries(Object.entries(presets.get(part.instrument).controls).map(([name, spec]) => [name, part.tone[name] ?? spec.default]));
-  if (RECORDED[part.instrument]) return recordedNote(synth, lane, part, t, note.pitch, velocity, duration, tone, rng);
+  const tone = Object.fromEntries(Object.keys(presets.get(part.instrument).controls).map(name => [name, part.tone[name] ?? toneDefault(part.instrument, name, sound)]));
+  if (RECORDED[part.instrument] && sound === 'recorded') return recordedNote(synth, lane, part, t, note.pitch, velocity, duration, tone, rng);
   const start = synth.pending.length;
   switch (part.instrument) {
     case 'electric-piano': instruments.epiano(synth, lane, t, note.pitch, velocity, duration); break;
-    case 'pad': instruments.padVoice(synth, lane, t, note.pitch, velocity, duration, tone); break;
+    case 'pad': case 'strings': instruments.padVoice(synth, lane, t, note.pitch, velocity, duration, tone); break;
     case 'pluck': instruments.pluck(synth, lane, t, note.pitch, velocity, { bright: tone.brightness, decay: tone.release }); break;
     case 'acid-bass': instruments.pluck(synth, lane, t, note.pitch, velocity, { bright: tone.brightness, decay: tone.release, q: 5, level: 0.18 }); break;
     case 'bass': instruments.bass(synth, lane, t, note.pitch, velocity, duration); break;
@@ -98,7 +115,14 @@ function schedule(synth, lane, note, part, beatSeconds, rng) {
       instruments.clap(synth, lane, t, velocity, rng, { level: 0.14 });
       instruments.bass(synth, lane, t, 50, velocity, 0.035, { level: 0.075, staccato: true });
       break;
-    case 'hi-hat': instruments.hat(synth, lane, t, velocity, rng); break;
+    case 'hi-hat': case 'closed-hat': instruments.hat(synth, lane, t, velocity, rng); break;
+    case 'guitar-clean': case 'guitar-crunch': case 'electric-bass': instruments.guitar(synth, lane, t, note.pitch, velocity, duration, rng, { ...tone, bass: part.instrument === 'electric-bass' }); break;
+    case 'rock-kick': instruments.rockKick(synth, lane, t, velocity, rng); break;
+    case 'rock-snare': instruments.rockSnare(synth, lane, t, velocity, rng); break;
+    case 'tom': instruments.tom(synth, lane, t, note.pitch, velocity, rng); break;
+    case 'crash': instruments.cymbal(synth, lane, t, velocity, rng); break;
+    case 'ride': instruments.cymbal(synth, lane, t, velocity, rng, { ride: true }); break;
+    case 'open-hat': instruments.hat(synth, lane, t, velocity, rng, { open: true, level: 0.09 }); break;
     case 'shaker': instruments.shaker(synth, lane, t, velocity, rng); break;
     default: sustained(synth, lane, t, note.pitch, velocity, duration, part.instrument, tone, rng);
   }
@@ -177,12 +201,13 @@ export async function renderScore(score, options = {}) {
   if (last <= first) throw new RangeError('Render range must contain at least one sample.');
   const cut = audio => audioBuffer([0, 1].map(ch => audio.getChannelData(ch).slice(first, last)), sampleRate);
   const audio = cut(full.audio);
-  const report = { ...analyzeAudio([audio.getChannelData(0), audio.getChannelData(1)], sampleRate), from, to: to ?? total, sections: full.report.sections, suggestions: full.report.suggestions, loudness: full.report.loudness, loudnessGainDb: full.report.loudnessGainDb, limitedFraction: full.report.limitedFraction, stemDescription: full.report.stemDescription };
+  const report = { ...analyzeAudio([audio.getChannelData(0), audio.getChannelData(1)], sampleRate), from, to: to ?? total, sections: full.report.sections, suggestions: full.report.suggestions, sound: full.report.sound, loudness: full.report.loudness, loudnessGainDb: full.report.loudnessGainDb, limitedFraction: full.report.limitedFraction, stemDescription: full.report.stemDescription };
   report.warnings = [...technicalWarnings(report), ...full.report.warnings.filter(w => w.code === 'squashed')];
   return { ...full, audio, report, ...(full.stems ? { stems: Object.fromEntries(Object.entries(full.stems).map(([id, stem]) => [id, cut(stem)])) } : {}) };
 }
 
-async function renderRange(score, { sampleRate = 44100, mix = {}, projectDir, stems = false, from = 0, to, progress, signal, speech } = {}) {
+async function renderRange(score, { sampleRate = 44100, mix = {}, projectDir, stems = false, from = 0, to, progress, signal, speech, sound = 'recorded' } = {}) {
+  if (!SOUNDS.includes(sound)) throw new TypeError(`sound must be one of: ${SOUNDS.join(', ')}.`);
   const expandedScore = compileScore(score);
   bounded(sampleRate, RENDER_LIMITS.minSampleRate, RENDER_LIMITS.maxSampleRate, 'sampleRate');
   if (!Number.isInteger(sampleRate)) throw new TypeError('sampleRate must be an integer.');
@@ -208,16 +233,16 @@ async function renderRange(score, { sampleRate = 44100, mix = {}, projectDir, st
   for (const part of controls.parts) {
     if (!part.audible || !part.notes.length) continue;
     const synth = new Synth(sampleRate, lastFrame);
-    const tone = presets.get(part.instrument).controls;
-    const cutoff = part.tone.brightness ?? tone.brightness?.default;
-    const filter = ['hi-hat', 'shaker'].includes(part.instrument) ? { type: 'highpass', freq: 6500 } : part.instrument === 'clap' || part.instrument === 'snare' ? { type: 'bandpass', freq: 1800, q: 0.7 } : cutoff ? { type: 'lowpass', freq: cutoff } : null;
+    const cutoff = part.tone.brightness ?? toneDefault(part.instrument, 'brightness', sound);
+    const noiseHats = sound === 'synthesized' ? ['hi-hat', 'shaker', 'open-hat', 'closed-hat'] : ['hi-hat', 'shaker'];
+    const filter = noiseHats.includes(part.instrument) ? { type: 'highpass', freq: 6500 } : part.instrument === 'clap' || part.instrument === 'snare' ? { type: 'bandpass', freq: 1800, q: 0.7 } : cutoff ? { type: 'lowpass', freq: cutoff } : null;
     const lane = synth.lane({ gain: part.volume, pan: part.pan, filter, overdrive: part.instrument === 'guitar-crunch' ? (part.tone.drive ?? 0.7) : null });
     const rng = makeRng(hashSeed(expandedScore.seed, part.id));
     let sample, events;
     if (part.instrument === 'sample') {
       sample = await loadSample(part.sample, sampleRate, expandedScore.bpm, projectDir, speech);
       events = part.notes.filter(n => n.beat * beatSeconds < end).map(n => ({ start: Math.round(n.beat * beatSeconds * sampleRate), length: Math.min(sample.length, Math.round(n.duration * beatSeconds * sampleRate)), velocity: n.velocity }));
-    } else for (const note of part.notes) if (note.beat * beatSeconds < end) schedule(synth, lane, note, part, beatSeconds, rng);
+    } else for (const note of part.notes) if (note.beat * beatSeconds < end) schedule(synth, lane, note, part, beatSeconds, rng, sound);
     buses.push({ part, synth, sample, events, next: 0, active: [], left: new Float32Array(BLOCK), right: new Float32Array(BLOCK) });
     check('preparing', 0);
   }
@@ -274,6 +299,7 @@ async function renderRange(score, { sampleRate = 44100, mix = {}, projectDir, st
   report.from = from;
   report.to = end;
   report.sections = expandedScore.sections.map(s => ({ ...s, time: s.beat * beatSeconds, duration: s.beats * beatSeconds }));
+  report.sound = sound;
   report.suggestions = arrangementSuggestions(expandedScore);
   report.loudness = mastered.loudness;
   report.loudnessGainDb = mastered.gainDb;

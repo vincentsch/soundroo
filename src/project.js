@@ -190,16 +190,19 @@ export function getLibrary(directory, jobs = []) {
   return { collection, tracks, jobs, directory: libraryPath(directory) };
 }
 
-export async function renderTrack(directory, id, { sampleRate = 44100, stems = false, progress, log } = {}) {
+// sound 'synthesized' renders the same version with every instrument synthesized, as an alternative listen
+// beside the recorded one; it is saved next to it and doesn't add a version.
+export async function renderTrack(directory, id, { sampleRate = 44100, stems = false, progress, log, sound = 'recorded' } = {}) {
   const score = readScore(directory, id), mix = readMix(directory, id), revision = sourceIdentity(directory, score, mix, sampleRate);
   const dir = trackPath(directory, id, 'renders'); fs.mkdirSync(dir, { recursive: true });
-  const wavFile = trackPath(directory, id, 'renders', revision + '.wav');
-  const reportFile = trackPath(directory, id, 'renders', revision + '.report.json');
-  const stemsDir = trackPath(directory, id, 'stems', revision);
+  const name = sound === 'recorded' ? revision : `${revision}.${sound}`;
+  const wavFile = trackPath(directory, id, 'renders', name + '.wav');
+  const reportFile = trackPath(directory, id, 'renders', name + '.report.json');
+  const stemsDir = trackPath(directory, id, 'stems', name);
   const cached = fs.existsSync(wavFile) && fs.existsSync(reportFile) && (!stems || fs.existsSync(stemsDir));
   let report;
   if (!cached) {
-    const result = await engine.render(score, { sampleRate, mix, projectDir: libraryPath(directory), stems, progress, speech: { log } });
+    const result = await engine.render(score, { sampleRate, mix, projectDir: libraryPath(directory), stems, progress, sound, speech: { log } });
     report = result.report;
     const temporary = wavFile + '.tmp'; fs.writeFileSync(temporary, result.wav, { mode: 0o600 }); fs.renameSync(temporary, wavFile);
     writeJson(reportFile, report);
@@ -211,6 +214,7 @@ export async function renderTrack(directory, id, { sampleRate = 44100, stems = f
       writeJson(path.join(stemsDir, 'notes.json'), { note: 'Dry instrument stems include part volume, pan, mute and solo. Shared master reverb, compression and gain are in the master WAV only.', revision });
     }
   } else report = readJson(reportFile);
+  if (sound !== 'recorded') { progress?.(1); return { id, revision, sound, duration: report.duration, file: wavFile, report, cached, stemsDir: stems ? stemsDir : null }; }
   const versions = readVersions(directory, id);
   let entry = versions.find(v => v.id === revision);
   if (!entry) { entry = { id: revision, label: 'Version ' + (versions.length + 1), date: new Date().toISOString(), duration: report.duration, sampleRate }; versions.push(entry); writeJson(path.join(dir, 'index.json'), versions); }

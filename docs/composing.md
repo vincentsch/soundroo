@@ -84,6 +84,8 @@ For video game music, `chip-lead` is a pulse wave like the sound chips in 8-bit 
 
 Velocity picks the recorded layer: soft notes sound softer, not just quieter. Strings and brass hold long notes steadily; their `detune` doubles the section with a second take, and `attack` adds a slower swell. Electronic timbres, mallets, textures and processed speech are synthesized.
 
+Every score can also play with all instruments synthesized: `node bin/soundroo.js render <track> --sound synthesized` saves that version beside the recorded one. soundroo.com renders both, and listeners switch between them in the player. Write for the recorded instruments; the synthesized version follows the same notes.
+
 Each piece should have a musical identity. Vary motif, harmony, rhythm, dynamics, density, register and arrangement. Use named pattern variations and a contrasting section. Avoid stacking every instrument at full level or using a lead continuously. A deliberate ending needs room for releases; simply truncating the final note can make a valid score sound unfinished.
 
 ## Speech as musical material

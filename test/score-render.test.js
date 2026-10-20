@@ -231,3 +231,16 @@ test('chip instruments render pulse and triangle waves and the pulse width chang
   assert.ok(difference > 1, 'the duty setting changes the waveform');
   assert.deepEqual(validateScore({ ...score(0.9) }).issues.map(i => i.path), ['parts[0].tone.duty']);
 });
+
+test('the synthesized sound plays recorded instruments by synthesis on the same timeline', async () => {
+  const score = fixture();
+  score.parts = ['piano', 'guitar-crunch', 'electric-bass', 'rock-kick', 'closed-hat', 'brass', 'strings'].map((instrument, i) => ({ ...score.parts[0], id: `p${i}`, instrument, tone: {}, notes: [note(instrument === 'rock-kick' || instrument === 'closed-hat' ? 36 : 55 + i, 0, 1), note(60, 1, 1)] }));
+  const recorded = await renderScore(score, options);
+  const synthesized = await renderScore(score, { ...options, sound: 'synthesized' });
+  assert.equal(synthesized.report.sound, 'synthesized'); assert.equal(recorded.report.sound, 'recorded');
+  assert.equal(synthesized.audio.length, recorded.audio.length);
+  assert.equal(synthesized.report.nonFinite, 0); assert.ok(synthesized.report.rms > 0.0001);
+  assert.ok(changed(samples(recorded), samples(synthesized)));
+  assert.deepEqual(samples(await renderScore(score, { ...options, sound: 'synthesized' })), samples(synthesized));
+  await assert.rejects(renderScore(score, { ...options, sound: 'orchestral' }), /sound must be one of/);
+});

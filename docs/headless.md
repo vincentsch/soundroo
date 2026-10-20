@@ -47,6 +47,7 @@ const fingerprint = soundroo.fingerprint(score);             // 'fp1:…'
 | `sampleRate` | 8,000–96,000 Hz. Default 44,100. |
 | `from`, `to` | Seconds on the score timeline for an excerpt. Synthesis and effects still run from the start. |
 | `stems` | Adds `stems: {partId: wav}`: dry buses after part mix, before master processing. |
+| `sound` | `recorded` (default) or `synthesized`: every instrument synthesized, as engines before 0.6.0 played them. Same timeline and mastering; the revision stays the same. |
 | `projectDir` | Library folder for `assets/` WAVs. Network scores should not use local WAVs. |
 | `speech` | `{cacheDir, synthesize, modelDir, offline, log}` for speech recipes. |
 | `progress`, `signal` | Progress callback and AbortSignal, as in `renderScore`. |

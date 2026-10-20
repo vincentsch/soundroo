@@ -10,7 +10,7 @@
 // docs/headless.md describes every export and the identity rules.
 import fs from 'node:fs';
 import { validateScore, compileScore, SCORE_VERSIONS } from './score.js';
-import { renderScore, RENDER_LIMITS } from './render.js';
+import { renderScore, RENDER_LIMITS, SOUNDS } from './render.js';
 import { encodeWav } from './audio/wav.js';
 import { encodeMidi } from './audio/midi.js';
 import { coverSvg, SLEEVE_STYLES } from './artwork.js';
@@ -26,7 +26,7 @@ const programs = new Map(getCatalog().instruments.map(preset => [preset.id, pres
 
 /** Engine release facts: {version, hash, scoreVersions, fingerprint, limits, speech}. */
 export function engineInfo() {
-  return { version: VERSION, hash: engineHash(), scoreVersions: [...SCORE_VERSIONS], fingerprint: FINGERPRINT_VERSION, limits: { ...LIMITS }, speech: { model: SPEECH_MODEL.id, dtype: SPEECH_MODEL.dtype, weights: SPEECH_MODEL.weights, sha256: SPEECH_MODEL.sha256, voices: [...SPEECH_VOICES] } };
+  return { version: VERSION, hash: engineHash(), scoreVersions: [...SCORE_VERSIONS], sounds: [...SOUNDS], fingerprint: FINGERPRINT_VERSION, limits: { ...LIMITS }, speech: { model: SPEECH_MODEL.id, dtype: SPEECH_MODEL.dtype, weights: SPEECH_MODEL.weights, sha256: SPEECH_MODEL.sha256, voices: [...SPEECH_VOICES] } };
 }
 
 /** {valid, issues: [{path, message}]} for score version 1 or 2. Never throws. */

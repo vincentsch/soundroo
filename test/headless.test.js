@@ -177,6 +177,7 @@ test('engine facts, limits, artwork checks and validation errors are useful to a
   assert.equal(info.version, VERSION);
   assert.equal(info.hash, soundroo.engineHash());
   assert.deepEqual(info.scoreVersions, [1, 2]);
+  assert.deepEqual(info.sounds, ['recorded', 'synthesized']);
   assert.equal(info.fingerprint, 'fp1');
   for (const key of ['maxSeconds', 'maxParts', 'maxEvents', 'maxPatterns', 'maxClips', 'maxNotationCharacters', 'maxSpeechRecipes', 'maxSpeechCharacters', 'minSampleRate', 'maxSampleRate', 'maxSampleSeconds', 'maxSampleBytes']) assert.ok(Number.isFinite(soundroo.LIMITS[key]), key);
   assert.match(info.speech.sha256, /^[0-9a-f]{64}$/);
