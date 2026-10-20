@@ -9,6 +9,8 @@ A good groove makes a track feel alive before the melody starts. These are start
 
 ## Drum patterns
 
+Live-band styles (rock, funk, soul, pop) sound best on the recorded acoustic kit: `rock-kick`, `rock-snare`, `closed-hat`, `open-hat`, `ride`, `tom` and `crash`. Dance, hip-hop and electronic styles use the drum-machine kit: `kick`, `snare`, `clap`, `hi-hat` and `shaker`.
+
 | Style | Tempo | Kick | Snare or clap | Hats |
 | --- | --- | --- | --- | --- |
 | House, disco, dance-pop | 118 to 128 | `X...X...X...X...` | clap `....X.......X...` | open hat `..x...x...x...x.`, shaker `xoxoxoxoxoxoxoxo` |

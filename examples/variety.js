@@ -85,7 +85,7 @@ function hotwireBoogie(seed) {
   const piano = part('piano', 'Barrelhouse piano', 'piano', 0.45, -0.28, { brightness: 4200, release: 0.3 });
   const kick = part('kick', 'Kick', 'rock-kick', 0.6);
   const snare = part('snare', 'Snare', 'rock-snare', 0.8, 0.04);
-  const hat = part('hat', 'Hi-hat', 'hi-hat', 1.9, -0.3);
+  const hat = part('hat', 'Hi-hat', 'closed-hat', 1.9, -0.3);
   const ride = part('ride', 'Ride', 'ride', 0.92, 0.32);
   const crash = part('crash', 'Crash', 'crash', 0.76, -0.18);
   const toms = part('toms', 'Toms', 'tom', 0.6, 0.12);
@@ -303,7 +303,7 @@ function rooftopRiot(seed) {
   const bass = part('bass', 'Pick bass', 'electric-bass', 0.88, 0, { brightness: 2600, palmMute: 0.35, release: 0.5 });
   const kick = part('kick', 'Kick', 'rock-kick', 0.62);
   const snare = part('snare', 'Snare', 'rock-snare', 0.82, 0.04);
-  const hat = part('hat', 'Hi-hat', 'hi-hat', 1.9, -0.32);
+  const hat = part('hat', 'Hi-hat', 'closed-hat', 1.9, -0.32);
   const open = part('open-hat', 'Open hat', 'open-hat', 1.2, -0.25);
   const crash = part('crash', 'Crash', 'crash', 0.8, 0.22);
   const toms = part('toms', 'Toms', 'tom', 0.62, -0.08);
@@ -519,7 +519,7 @@ function northboundLights(seed) {
   const organ = part('organ', 'Organ swell', 'organ', 0.3, -0.12, { brightness: 2400, attack: 0.08, release: 0.5 });
   const kick = part('kick', 'Kick', 'rock-kick', 0.64);
   const snare = part('snare', 'Snare', 'rock-snare', 0.85, 0.03);
-  const hat = part('hat', 'Hi-hat', 'hi-hat', 1.9, -0.3);
+  const hat = part('hat', 'Hi-hat', 'closed-hat', 1.9, -0.3);
   const ride = part('ride', 'Ride', 'ride', 1, 0.32);
   const crash = part('crash', 'Crash', 'crash', 0.8, -0.22);
   const toms = part('toms', 'Toms', 'tom', 0.7, 0.1);

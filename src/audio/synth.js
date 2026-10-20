@@ -127,7 +127,7 @@ function polyblep(t, dt) {
   return 0;
 }
 
-export const WAVES = { sine: 0, saw: 1, tri: 2, square: 3, noise: 4, pink: 5, string: 6 };
+export const WAVES = { sine: 0, saw: 1, tri: 2, square: 3, noise: 4, pink: 5, sample: 6 };
 
 // --- biquad (RBJ cookbook) ------------------------------------------------------------
 
@@ -186,6 +186,9 @@ export function makeFilter(type, freq, q = 0.707) {
 // lane (mono) or panned into it (stereo lanes).
 //   layer: { wave, freq: number, freqEnv?: Env (Hz, overrides freq), detune (cents),
 //            amp: Env, fm?: { ratio, depth: Env (Hz) }, seed }
+//   sample layer: { wave: WAVES.sample, data: Float32Array, step (source frames per
+//            output frame), start?: first source frame, loop?: [start, end] source frames,
+//            detune, amp: Env }
 //   filter: { type, freq, freqEnv?: Env, q }
 export class Voice {
   constructor(t0, t1) {
@@ -505,22 +508,7 @@ export class Synth {
       L.b1 = 0;
       L.b2 = 0;
       L.mul = L.detune ? Math.pow(2, L.detune / 1200) : 1;
-      if (L.wave === 6) {
-        const delay = Math.max(2, sr / L.freq - 0.5);
-        const length = Math.ceil(delay);
-        L.string = new Float32Array(length);
-        L.stringFraction = length - delay;
-        L.stringIndex = 0;
-        L.stringPrevious = 0;
-        let sum = 0, seed = L.rs;
-        for (let i = 0; i < length; i++) {
-          seed ^= seed << 13; seed ^= seed >>> 17; seed ^= seed << 5;
-          L.string[i] = (seed >>> 0) / 2147483648 - 1;
-          sum += L.string[i];
-        }
-        for (let i = 0; i < length; i++) L.string[i] -= sum / length;
-        L.stringLoss = Math.exp(-1 / (L.freq * (L.decay ?? 2)));
-      }
+      L.pos = L.start ?? 0;
     }
     if (v.filter) {
       const f = v.filter;
@@ -664,19 +652,19 @@ export class Synth {
           L.b2 = b2;
           break;
         }
-        case 6: { // fractional-delay Karplus–Strong plucked string
-          const buffer = L.string, length = buffer.length;
-          let index = L.stringIndex, previous = L.stringPrevious;
-          const fraction = L.stringFraction, loss = L.stringLoss;
+        case 6: { // recorded sample, 4-point Hermite interpolation, optional sustain loop
+          const data = L.data, last = data.length - 2, step = L.step * mul, loop = L.loop;
+          let pos = L.pos;
           for (let k = 0; k < cnt; k++) {
-            const next = index + 1 === length ? 0 : index + 1;
-            const value = buffer[index] * (1 - fraction) + buffer[next] * fraction;
-            buffer[index] = (value + previous) * 0.5 * loss;
-            previous = value;
-            acc[k] += value * amp[k];
-            index = next;
+            if (loop && pos >= loop[1]) pos -= loop[1] - loop[0];
+            const i = pos | 0;
+            if (i >= last) break;
+            const f = pos - i, xm1 = data[i > 0 ? i - 1 : 0], x0 = data[i], x1 = data[i + 1], x2 = data[i + 2];
+            const c1 = 0.5 * (x1 - xm1), c2 = xm1 - 2.5 * x0 + 2 * x1 - 0.5 * x2, c3 = 0.5 * (x2 - xm1) + 1.5 * (x0 - x1);
+            acc[k] += (((c3 * f + c2) * f + c1) * f + x0) * amp[k];
+            pos += step;
           }
-          L.stringIndex = index; L.stringPrevious = previous;
+          L.pos = pos;
           break;
         }
         default:

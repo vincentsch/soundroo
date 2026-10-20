@@ -5,6 +5,7 @@ import { compileScore } from './score.js';
 import { getCatalog } from './catalog.js';
 import { Synth, Voice, Env, WAVES, Reverb, Compressor, BLOCK } from './audio/synth.js';
 import * as instruments from './audio/instruments.js';
+import { sampledNote } from './audio/sampler.js';
 import { mtof } from './audio/dsp.js';
 import { makeRng, hashSeed } from './audio/rng.js';
 import { parseWav, toMono, resample } from './audio/pcm.js';
@@ -45,10 +46,6 @@ function sustained(synth, lane, t, pitch, velocity, duration, id, tone, rng) {
   if (id === 'fm-lead') v.layer({ wave: WAVES.sine, freq: f, amp: envelope(0.14), fm: { ratio: 2, depth: new Env(f * 2).set(f * 2, t).target(f * 0.18, t, 0.16) } });
   else if (id === 'organ') {
     for (const [ratio, level] of [[1, 0.09], [2, 0.045], [3, 0.025], [4, 0.014]]) if (f * ratio < synth.sr * 0.45) v.layer({ wave: WAVES.sine, freq: f * ratio, amp: envelope(level) });
-  } else if (id === 'piano') {
-    for (const [ratio, level] of [[1, 0.17], [2, 0.08], [3, 0.035], [4, 0.02]]) if (f * ratio < synth.sr * 0.45) {
-      v.layer({ wave: WAVES.sine, freq: f * ratio, amp: new Env(0).set(0, t).lin(level * velocity, t + 0.003).target(level * velocity * 0.08, t + 0.003, 0.38 / ratio).target(0, t + duration, release / 3) });
-    }
   } else if (id === 'noise') v.layer({ wave: WAVES.pink, seed: Math.floor(rng.next() * 0xffffffff), amp: envelope(0.055), freq: 0 });
   else if (id === 'chip-lead') v.layer({ wave: WAVES.square, duty: tone.duty, freq: f, amp: envelope(0.085) });
   else if (id === 'chip-bass') v.layer({ wave: WAVES.tri, freq: f, amp: envelope(0.2) });
@@ -56,13 +53,32 @@ function sustained(synth, lane, t, pitch, velocity, duration, id, tone, rng) {
   synth.add(lane, v);
 }
 
+// Instruments played from recordings in assets/samples, with their level next
+// to the synthesized ones. Drums ring out; the others follow the note length.
+const RECORDED = {
+  piano: { level: 0.35 }, strings: { level: 0.12 }, brass: { level: 0.27 },
+  'electric-bass': { level: 0.76 }, 'guitar-clean': { level: 0.3 }, 'guitar-crunch': { level: 0.6 },
+  'rock-kick': { level: 1.23, drum: true }, 'rock-snare': { level: 0.7, drum: true }, 'closed-hat': { level: 0.084, drum: true }, 'open-hat': { level: 0.14, drum: true },
+  tom: { level: 0.57, drum: true }, crash: { level: 0.59, drum: true }, ride: { level: 0.42, drum: true },
+};
+
+function recordedNote(synth, lane, part, t, pitch, velocity, duration, tone, rng) {
+  const { level, drum } = RECORDED[part.instrument];
+  if (drum) return sampledNote(synth, lane, t, part.instrument, part.instrument === 'tom' ? pitch : null, velocity, duration, rng, { level, timed: false, maxShift: 3 });
+  // Palm muting shortens the note and darkens it, as a hand on the strings does.
+  const mute = tone.palmMute ?? 0;
+  const filter = mute > 0.05 ? { type: 'lowpass', freq: 700 + 9000 * (1 - mute) ** 2, q: 0.707 } : null;
+  sampledNote(synth, lane, t, part.instrument, pitch, velocity, mute ? Math.min(duration, 0.06 + duration * (1 - mute)) : duration, rng, { level, release: (tone.release ?? 0.3) * (1 - mute * 0.8), attack: tone.attack ?? 0, doubled: tone.detune ?? 0, filter });
+}
+
 function schedule(synth, lane, note, part, beatSeconds, rng) {
   const t = note.beat * beatSeconds, duration = note.duration * beatSeconds, velocity = note.velocity;
   const tone = Object.fromEntries(Object.entries(presets.get(part.instrument).controls).map(([name, spec]) => [name, part.tone[name] ?? spec.default]));
+  if (RECORDED[part.instrument]) return recordedNote(synth, lane, part, t, note.pitch, velocity, duration, tone, rng);
   const start = synth.pending.length;
   switch (part.instrument) {
     case 'electric-piano': instruments.epiano(synth, lane, t, note.pitch, velocity, duration); break;
-    case 'pad': case 'strings': instruments.padVoice(synth, lane, t, note.pitch, velocity, duration, tone); break;
+    case 'pad': instruments.padVoice(synth, lane, t, note.pitch, velocity, duration, tone); break;
     case 'pluck': instruments.pluck(synth, lane, t, note.pitch, velocity, { bright: tone.brightness, decay: tone.release }); break;
     case 'acid-bass': instruments.pluck(synth, lane, t, note.pitch, velocity, { bright: tone.brightness, decay: tone.release, q: 5, level: 0.18 }); break;
     case 'bass': instruments.bass(synth, lane, t, note.pitch, velocity, duration); break;
@@ -76,13 +92,6 @@ function schedule(synth, lane, note, part, beatSeconds, rng) {
       break;
     case 'hi-hat': instruments.hat(synth, lane, t, velocity, rng); break;
     case 'shaker': instruments.shaker(synth, lane, t, velocity, rng); break;
-    case 'guitar-clean': case 'guitar-crunch': case 'electric-bass': instruments.guitar(synth, lane, t, note.pitch, velocity, duration, rng, { ...tone, bass: part.instrument === 'electric-bass' }); break;
-    case 'rock-kick': instruments.rockKick(synth, lane, t, velocity, rng); break;
-    case 'rock-snare': instruments.rockSnare(synth, lane, t, velocity, rng); break;
-    case 'tom': instruments.tom(synth, lane, t, note.pitch, velocity, rng); break;
-    case 'crash': instruments.cymbal(synth, lane, t, velocity, rng); break;
-    case 'ride': instruments.cymbal(synth, lane, t, velocity, rng, { ride: true }); break;
-    case 'open-hat': instruments.hat(synth, lane, t, velocity, rng, { open: true, level: 0.09 }); break;
     default: sustained(synth, lane, t, note.pitch, velocity, duration, part.instrument, tone, rng);
   }
   // The primitives' acoustic partials assume 44.1 kHz; omit inaudible partials
@@ -93,8 +102,8 @@ function schedule(synth, lane, note, part, beatSeconds, rng) {
 // The note values each instrument's synthesis above reads; a fingerprint
 // ignores the rest. Drums and samples ignore pitch, toms clamp it, and
 // struck or plucked sounds decay without reading duration.
-const UNPITCHED = new Set(['kick', 'snare', 'clap', 'hi-hat', 'shaker', 'rock-kick', 'rock-snare', 'crash', 'ride', 'open-hat', 'noise', 'sample']);
-const UNTIMED = new Set(['pluck', 'acid-bass', 'bell', 'marimba', 'kick', 'snare', 'clap', 'hi-hat', 'shaker', 'rock-kick', 'rock-snare', 'tom', 'crash', 'ride', 'open-hat']);
+const UNPITCHED = new Set(['kick', 'snare', 'clap', 'hi-hat', 'shaker', 'rock-kick', 'rock-snare', 'closed-hat', 'crash', 'ride', 'open-hat', 'noise', 'sample']);
+const UNTIMED = new Set(['pluck', 'acid-bass', 'bell', 'marimba', 'kick', 'snare', 'clap', 'hi-hat', 'shaker', 'rock-kick', 'rock-snare', 'closed-hat', 'tom', 'crash', 'ride', 'open-hat']);
 export function audibleNote(instrument, { pitch, beat, duration, velocity }) {
   return { pitch: UNPITCHED.has(instrument) ? null : instrument === 'tom' ? Math.max(35, Math.min(60, pitch)) : pitch, beat, duration: UNTIMED.has(instrument) ? null : duration, velocity };
 }
@@ -193,7 +202,7 @@ async function renderRange(score, { sampleRate = 44100, mix = {}, projectDir, st
     const synth = new Synth(sampleRate, lastFrame);
     const tone = presets.get(part.instrument).controls;
     const cutoff = part.tone.brightness ?? tone.brightness?.default;
-    const filter = ['hi-hat', 'shaker', 'open-hat'].includes(part.instrument) ? { type: 'highpass', freq: 6500 } : part.instrument === 'clap' || part.instrument === 'snare' ? { type: 'bandpass', freq: 1800, q: 0.7 } : cutoff ? { type: 'lowpass', freq: cutoff } : null;
+    const filter = ['hi-hat', 'shaker'].includes(part.instrument) ? { type: 'highpass', freq: 6500 } : part.instrument === 'clap' || part.instrument === 'snare' ? { type: 'bandpass', freq: 1800, q: 0.7 } : cutoff ? { type: 'lowpass', freq: cutoff } : null;
     const lane = synth.lane({ gain: part.volume, pan: part.pan, filter, overdrive: part.instrument === 'guitar-crunch' ? (part.tone.drive ?? 0.7) : null });
     const rng = makeRng(hashSeed(expandedScore.seed, part.id));
     let sample, events;

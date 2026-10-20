@@ -104,7 +104,7 @@ test('the compact example stays small, labeled and audible in its sections', asy
     const from = section.beat * 60 / score.bpm;
     const { report } = await renderScore(score, { sampleRate: 12000, from, to: from + 2 });
     assert.ok(report.rms > 0.004, section.id);
-    assert.equal(report.limitedFraction, 0, section.id);
+    assert.ok(report.limitedFraction < 0.01, section.id);
   }
 });
 

@@ -1,6 +1,7 @@
 // Content identities for the engine, a render's source and a score's music.
 //
-//   engineHash        the rendering and validation source and built-in voices.
+//   engineHash        the rendering and validation source, built-in voices and
+//                     recorded instrument samples.
 //                     Toolkit version, CLI, studio and network code do not count.
 //   sourceIdentity    one render's revision: score, mix, sample rate, engine and
 //                     referenced local WAVs. Speech recipes count by their words,
@@ -19,7 +20,7 @@ import { audibleNote, audibleSample } from './render.js';
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const ENGINE_FILES = ['src/identity.js', 'src/catalog.js', 'src/headless.js', 'src/notation.js', 'src/render.js', 'src/score.js', 'src/speech.js'];
-const ENGINE_FOLDERS = [['src/audio', '.js'], ['assets/voices', '.wav']];
+const ENGINE_FOLDERS = [['src/audio', '.js'], ['assets/voices', '.wav'], ['assets/samples', '.wav'], ['assets/samples', '.json']];
 const presets = new Map(getCatalog().instruments.map(preset => [preset.id, preset]));
 const sha256 = data => crypto.createHash('sha256').update(data).digest('hex');
 
@@ -32,7 +33,7 @@ export function canonicalJson(value) {
 
 export function engineManifest() {
   const files = [...ENGINE_FILES];
-  for (const [folder, extension] of ENGINE_FOLDERS) for (const name of fs.readdirSync(path.join(ROOT, folder))) if (name.endsWith(extension)) files.push(`${folder}/${name}`);
+  for (const [folder, extension] of ENGINE_FOLDERS) for (const name of fs.readdirSync(path.join(ROOT, folder), { recursive: true })) if (name.endsWith(extension)) files.push(`${folder}/${name.split(path.sep).join('/')}`);
   return files.sort().map(file => {
     let bytes = fs.readFileSync(path.join(ROOT, file));
     // A Windows checkout's line endings do not change the engine.

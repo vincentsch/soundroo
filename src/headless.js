@@ -74,7 +74,7 @@ export function fingerprint(score) {
   return musicFingerprint(score);
 }
 
-const PERCUSSION = { kick: 36, snare: 38, clap: 39, 'hi-hat': 42, shaker: 70, 'rock-kick': 36, 'rock-snare': 38, tom: 45, crash: 49, ride: 51, 'open-hat': 46 };
+const PERCUSSION = { kick: 36, snare: 38, clap: 39, 'hi-hat': 42, shaker: 70, 'rock-kick': 36, 'rock-snare': 38, 'closed-hat': 42, tom: 45, crash: 49, ride: 51, 'open-hat': 46 };
 // GM toms occupy a sparse range; other pitches would select cymbals or effects.
 const tomPitch = pitch => [41, 43, 45, 47, 48, 50].reduce((a, b) => Math.abs(b - pitch) < Math.abs(a - pitch) ? b : a);
 /** Standard MIDI file bytes (format 1, 480 ticks per beat): a conductor track

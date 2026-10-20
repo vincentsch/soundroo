@@ -20,6 +20,12 @@
 
 ![The Soundroo music player with the Turn It Up example collection](docs/studio.jpg)
 
+**Listen first:** the [Turn It Up](https://soundroo.com/@soundroo/collections/turn-it-up)
+collection was written with this toolkit, from the
+[rock and roll boogie](https://soundroo.com/@soundroo/hotwire-boogie) to the
+[nu-disco funk](https://soundroo.com/@soundroo/mirrorball-shift) and
+[hyperpop](https://soundroo.com/@soundroo/pixel-riot).
+
 ## Make a track
 
 > [!TIP]
@@ -46,13 +52,15 @@ the first bars, a hook early on and a chorus or a drop.
 
 The agent writes the music as a score, a small JSON file with the tempo,
 the instruments and the notes. Drum patterns look like `X...x...X...x...`, and
-melodies like `G4/.5 Bb4 C5/1`. Soundroo's engine reads the score and
-synthesizes each sound from scratch, then mixes the parts into a stereo track.
+melodies like `G4/.5 Bb4 C5/1`. Soundroo's engine reads the score, plays each
+note, then mixes and masters the parts into a stereo track.
 
-The engine has 30 instrument types, all made in code: clean and overdriven
-electric guitars, electric and synth basses, rock and electronic drums,
-electric piano, organ, analog and FM synthesizers, pads, strings, bells,
-marimba and 8-bit chip sounds for video game music. Short spoken phrases can become rhythmic chops, tape and grain
+The engine has 32 instrument types. Grand piano, string and brass sections,
+clean and overdriven electric guitars, electric bass and an acoustic drum kit
+play recordings of real instruments (all public domain; see
+[assets/samples/SOURCES.md](assets/samples/SOURCES.md)). Electric piano, organ,
+analog and FM synthesizers, pads, synth basses, bells, marimba, a drum machine
+and 8-bit chip sounds for video game music are synthesized. Short spoken phrases can become rhythmic chops, tape and grain
 textures or a vocoder robot voice. The words come from
 [Kokoro](https://huggingface.co/hexgrad/Kokoro-82M), a small voice model that
 runs on your computer. It speaks, it doesn't sing.

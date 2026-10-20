@@ -100,52 +100,6 @@ export function marimba(syn, lane, t, midi, vel, { level = 0.16 } = {}) {
 
 // --- drums -----------------------------------------------------------------
 
-// Fractional-delay plucked strings. Notes use their own seeded excitation,
-// damp naturally, and are stopped by the fretting/palm envelope.
-export function guitar(syn, lane, t, midi, vel, dur, rng, { release = 1.2, palmMute = 0.1, bass = false } = {}) {
-  const f = mtof(midi), mute = palmMute;
-  const decay = Math.max(0.06, release * (1 - mute * 0.88));
-  const tail = Math.min(0.25, decay * 0.18);
-  const peak = (bass ? 0.48 : 0.55) * vel;
-  const amp = adsr(t, peak, 0.002, decay, 0.025, t + dur, tail / 3);
-  const voice = new Voice(t, t + dur + tail * 7);
-  voice.layer({ wave: WAVES.string, freq: f, seed: nextSeed(rng), decay: Math.max(0.2, decay * 5), amp });
-  if (bass) voice.layer({ wave: WAVES.sine, freq: f, amp: adsr(t, vel * 0.1, 0.006, decay, 0.2, t + dur, tail / 3) });
-  syn.add(lane, voice);
-}
-
-export function rockKick(syn, lane, t, vel, rng) {
-  const v = new Voice(t, t + 0.45);
-  v.layer({ wave: WAVES.sine, freqEnv: new Env(170).set(170, t).exp(52, t + 0.055), amp: perc(t, 0.6 * vel, 0.001, 0.065) });
-  v.layer({ wave: WAVES.noise, seed: nextSeed(rng), amp: perc(t, 0.055 * vel, 0.001, 0.006) });
-  syn.add(lane, v);
-}
-
-export function rockSnare(syn, lane, t, vel, rng) {
-  const v = new Voice(t, t + 0.55);
-  v.layer({ wave: WAVES.sine, freqEnv: new Env(215).set(215, t).exp(168, t + 0.035), amp: perc(t, 0.2 * vel, 0.001, 0.044) });
-  v.layer({ wave: WAVES.sine, freq: 330, amp: perc(t, 0.08 * vel, 0.001, 0.025) });
-  v.layer({ wave: WAVES.noise, seed: nextSeed(rng), amp: perc(t, 0.24 * vel, 0.001, 0.055) });
-  v.filter = { type: 'highpass', freq: 110, q: 0.7 };
-  syn.add(lane, v);
-}
-
-export function tom(syn, lane, t, midi, vel, rng) {
-  const f = mtof(Math.max(35, Math.min(60, midi))), v = new Voice(t, t + 0.65);
-  v.layer({ wave: WAVES.sine, freqEnv: new Env(f * 1.35).set(f * 1.35, t).exp(f, t + 0.05), amp: perc(t, 0.32 * vel, 0.001, 0.1) });
-  v.layer({ wave: WAVES.sine, freq: f * 1.59, amp: perc(t, 0.07 * vel, 0.001, 0.055) });
-  v.layer({ wave: WAVES.noise, seed: nextSeed(rng), amp: perc(t, 0.035 * vel, 0.001, 0.008) });
-  syn.add(lane, v);
-}
-
-export function cymbal(syn, lane, t, vel, rng, { ride = false } = {}) {
-  const tau = ride ? 0.18 : 0.36, v = new Voice(t, t + tau * 7);
-  v.layer({ wave: WAVES.noise, seed: nextSeed(rng), amp: perc(t, vel * (ride ? 0.045 : 0.11), 0.001, tau) });
-  for (const f of [1733, 2579, 3461, 4447, 5981]) if (f < syn.sr * 0.45) v.layer({ wave: WAVES.sine, freq: f, amp: perc(t, vel * (ride ? 0.027 : 0.012), 0.001, ride ? 0.11 : 0.24) });
-  v.filter = { type: 'highpass', freq: 1300, q: 0.7 };
-  syn.add(lane, v);
-}
-
 export function kick(syn, lane, t, vel, { level = 0.55 } = {}) {
   const v = new Voice(t, t + 0.6);
   v.layer({ wave: WAVES.sine, freqEnv: new Env(150).set(150, t).exp(47, t + 0.09), amp: perc(t, level * vel, 0.002, 0.085) });
