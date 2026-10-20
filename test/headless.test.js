@@ -51,7 +51,7 @@ test('headless render, MIDI and revision match what the CLI and studio write', a
 
 test('the engine hash covers rendering, validation and identity source, independent of line endings', async () => {
   const manifest = soundroo.engineManifest().map(f => f.path);
-  for (const file of ['src/score.js', 'src/notation.js', 'src/render.js', 'src/catalog.js', 'src/speech.js', 'src/headless.js', 'src/identity.js', 'src/audio/synth.js', 'src/audio/midi.js', 'assets/voices/made-of-light.wav']) assert.ok(manifest.includes(file), file);
+  for (const file of ['src/score.js', 'src/notation.js', 'src/render.js', 'src/catalog.js', 'src/speech.js', 'src/headless.js', 'src/identity.js', 'src/audio/synth.js', 'src/audio/midi.js', 'src/audio/sampler.js', 'assets/voices/made-of-light.wav', 'assets/samples/samples.json', 'assets/samples/piano/60-2-1.wav']) assert.ok(manifest.includes(file), file);
   for (const file of ['src/server.js', 'src/project.js', 'src/version.js', 'src/voice.js', 'src/artwork.js', 'src/compose.js', 'bin/soundroo.js', 'web/index.html', 'package.json']) assert.ok(!manifest.includes(file), file);
   assert.match(soundroo.engineHash(), /^[0-9a-f]{64}$/);
   const copy = temp('soundroo-engine-copy-');
@@ -64,6 +64,8 @@ test('the engine hash covers rendering, validation and identity source, independ
     for (const file of ['src/server.js', 'src/project.js', 'src/version.js']) fs.appendFileSync(path.join(copy, file), '\n// network and studio changes\n');
     const render = path.join(copy, 'src/render.js');
     fs.writeFileSync(render, fs.readFileSync(render, 'utf8').replace(/\r?\n/g, '\r\n'));
+    const samples = path.join(copy, 'assets/samples/samples.json');
+    fs.writeFileSync(samples, fs.readFileSync(samples, 'utf8').replace(/\r?\n/g, '\r\n'));
     assert.equal(hash(), original);
     fs.appendFileSync(render, '// engine change\r\n');
     assert.notEqual(hash(), original);

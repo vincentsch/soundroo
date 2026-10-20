@@ -37,7 +37,7 @@ export function engineManifest() {
   return files.sort().map(file => {
     let bytes = fs.readFileSync(path.join(ROOT, file));
     // A Windows checkout's line endings do not change the engine.
-    if (file.endsWith('.js')) bytes = Buffer.from(bytes.toString('utf8').replace(/\r\n/g, '\n'), 'utf8');
+    if (/\.(js|json)$/.test(file)) bytes = Buffer.from(bytes.toString('utf8').replace(/\r\n/g, '\n'), 'utf8');
     return { path: file, sha256: sha256(bytes), size: bytes.length };
   });
 }
