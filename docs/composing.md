@@ -14,6 +14,8 @@ Keep the scores and any script that writes them in that library. Add each score 
 
 [`examples/streetlight-funk.json`](../examples/streetlight-funk.json) is a whole track in about 6 KB: a 116 BPM funk groove with a syncopated kick, ghost-note snare, sixteenth hats, a bass riff that jumps octaves, muted guitar scratches, electric piano stabs and a synth hook from bar five. It has a count-in, a groove section, a build with a snare roll, a chorus where the hook moves up, a break without kick and snare, a longer last chorus and an ending. Read it for the shape, then write your own music. [Grooves](grooves.md) has drum and bass patterns for other styles.
 
+For other styles, start from the closest working example. `node bin/soundroo.js example` lists them with genre and tempo: rock and roll, garage pop-punk, indie guitars, dance-pop, nu-disco, Afro-pop, UK garage, deep house, liquid drum and bass, hyperpop, funk and 8-bit game music. `node bin/soundroo.js example rooftop-riot` prints one score. Look at how its drums and bass enter, where the hook comes and how the sections change, then write new music. soundroo.com refuses unchanged copies of the examples.
+
 Write a score as JSON, or write a small script that builds it, and keep it in the library:
 
 ```bash
@@ -66,7 +68,7 @@ Validation names the string and the token or character at fault. A string holds 
 
 Sleeve styles are `orbit`, `strata`, `window`, `wave`, `sun`, `petal`, `ripple`, `monolith`, `weave`, and `constellation`. Give a collection varied sleeves and a coherent palette, or omit artwork and let the studio assign distinct designs by track position. These are original generated SVGs; no image service is required.
 
-Part volume defaults to 1 and master volume to 0.8. The mix controls use the same defaults as the renderer. Render reports include `limitedFraction`: the fraction of samples flattened at the safety ceiling. If its warning appears, lower levels and render again; zero out-of-range samples alone does not mean the mix avoided limiting.
+Part volume defaults to 1 and master volume to 0.8. The mix controls use the same defaults as the renderer. Part volumes set the balance; the master then brings every track to the same loudness (see [Check and listen](#check-and-listen)).
 
 ## Instruments and sound
 
@@ -122,6 +124,8 @@ The studio's player volume changes listening only. Saved mixer values change the
 
 ## Check and listen
 
-Use validation before rendering. Inspect the report's peak, RMS, clipping, silence, invalid samples and sections. RMS is a signal measurement, not a LUFS reading or a music-quality score. Let differences in dynamics serve the music, and investigate extreme unexplained loudness changes between pieces.
+Use validation before rendering. Every render is mastered: a high-pass below 30 Hz, the same loudness for every track (about -14 LUFS, the level streaming services play at; the report's `loudness`) and a limiter that keeps peaks at -1 dBFS. Part volumes set the balance between parts. A master volume below the default 0.8 makes the whole track quieter; a higher one changes nothing. `limitedFraction` is the share of the track the limiter turns down by more than 3 dB; a track with sharp peaks is first played a little quieter, and if that is not enough the report warns that loud moments sound squashed. Lower the loudest parts then, usually drums or bass.
+
+The report's `suggestions` point at arrangement problems listeners notice: drums and bass that only come in after bar eight, the same four bars repeated unchanged for 24 bars or more, sections that all use the same parts, and a long silent ending. Fix them unless the person asked for exactly that.
 
 An agent without a verified audio-input capability cannot hear a render. Signal checks and score inspection can find technical problems but cannot approve taste. Use the listener's notes for melody, balance, timbre and fatigue. Make targeted revisions while retaining the successful parts of a piece.

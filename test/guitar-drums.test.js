@@ -25,9 +25,11 @@ test('palm mute shortens string sustain and guitar overdrive precedes the mixer 
   const muted = await renderScore(score('guitar-clean', { palmMute: 1 }), { sampleRate: 12000 });
   const energy = r => r.audio.getChannelData(0).slice(6000, 10000).reduce((n, x) => n + x * x, 0);
   assert.ok(energy(muted) < energy(open) * 0.5);
-  const source = score('guitar-crunch'), full = await renderScore(source, { sampleRate: 12000 });
-  const reduced = await renderScore(source, { sampleRate: 12000, mix: { parts: { guitar: { volume: 0.5 } } } });
-  assert.ok(Math.abs(reduced.report.rms / full.report.rms - 0.5) < 0.005);
+  // The master matches every render's loudness, so the fader shows on the part's dry stem.
+  const source = score('guitar-crunch'), full = await renderScore(source, { sampleRate: 12000, stems: true });
+  const reduced = await renderScore(source, { sampleRate: 12000, stems: true, mix: { parts: { guitar: { volume: 0.5 } } } });
+  const stemRms = r => { const data = r.stems.guitar.getChannelData(0); return Math.sqrt(data.reduce((n, x) => n + x * x, 0) / data.length); };
+  assert.ok(Math.abs(stemRms(reduced) / stemRms(full) - 0.5) < 0.005);
   assert.equal(full.report.nonFinite, 0); assert.equal(full.report.clipped, 0);
 });
 

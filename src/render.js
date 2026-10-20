@@ -10,11 +10,14 @@ import { makeRng, hashSeed } from './audio/rng.js';
 import { parseWav, toMono, resample } from './audio/pcm.js';
 import { tapePitch, granularVoice, vocodeVoice, chopVoice, CHOP_PATTERN } from './audio/voice-effects.js';
 import { analyzeAudio, technicalWarnings } from './audio/analysis.js';
+import { masterInPlace } from './audio/master.js';
+import { arrangementSuggestions } from './arrangement.js';
 import { speechAudio } from './speech.js';
 
 export const RENDER_LIMITS = Object.freeze({ minSampleRate: 8000, maxSampleRate: 96000, maxSampleSeconds: 60, maxSampleBytes: 32 * 1024 * 1024 });
 const presets = new Map(getCatalog().instruments.map(p => [p.id, p]));
-const ceiling = Math.pow(10, -1 / 20);
+// Every render is matched to the same loudness; a master volume below the default turns it down from there.
+const DEFAULT_MASTER_VOLUME = 0.8;
 const audioBuffer = (channels, sampleRate) => ({ length: channels[0].length, sampleRate, numberOfChannels: channels.length, getChannelData(index) { if (!Number.isInteger(index) || !channels[index]) throw new RangeError('Invalid audio channel.'); return channels[index]; } });
 function bounded(value, min, max, label) {
   if (!Number.isFinite(value) || value < min || value > max) throw new TypeError(`${label} must be a finite number from ${min} to ${max}.`);
@@ -144,7 +147,25 @@ async function loadSample(sample, sampleRate, bpm, projectDir, speech) {
  * to cancel. Stems are dry post-part-mix buses, before shared master processing.
  * speech {cacheDir, synthesize, modelDir, offline, log} configures speech recipes (speech.js).
  */
-export async function renderScore(score, { sampleRate = 44100, mix = {}, projectDir, stems = false, from = 0, to, progress, signal, speech } = {}) {
+export async function renderScore(score, options = {}) {
+  const { from = 0, to } = options;
+  const compiled = compileScore(score), total = compiled.beats * 60 / compiled.bpm;
+  if (from === 0 && (to === undefined || to === total)) return renderRange(score, options);
+  // An excerpt plays at the level of the whole track: render it all, master it once, then cut the excerpt.
+  bounded(from, 0, total, 'from');
+  bounded(to ?? total, 0, total, 'to');
+  if ((to ?? total) <= from) throw new RangeError('to must be after from.');
+  const full = await renderRange(score, { ...options, from: 0, to: undefined });
+  const sampleRate = full.audio.sampleRate, first = Math.round(from * sampleRate), last = Math.round((to ?? total) * sampleRate);
+  if (last <= first) throw new RangeError('Render range must contain at least one sample.');
+  const cut = audio => audioBuffer([0, 1].map(ch => audio.getChannelData(ch).slice(first, last)), sampleRate);
+  const audio = cut(full.audio);
+  const report = { ...analyzeAudio([audio.getChannelData(0), audio.getChannelData(1)], sampleRate), from, to: to ?? total, sections: full.report.sections, suggestions: full.report.suggestions, loudness: full.report.loudness, loudnessGainDb: full.report.loudnessGainDb, limitedFraction: full.report.limitedFraction, stemDescription: full.report.stemDescription };
+  report.warnings = [...technicalWarnings(report), ...full.report.warnings.filter(w => w.code === 'squashed')];
+  return { ...full, audio, report, ...(full.stems ? { stems: Object.fromEntries(Object.entries(full.stems).map(([id, stem]) => [id, cut(stem)])) } : {}) };
+}
+
+async function renderRange(score, { sampleRate = 44100, mix = {}, projectDir, stems = false, from = 0, to, progress, signal, speech } = {}) {
   const expandedScore = compileScore(score);
   bounded(sampleRate, RENDER_LIMITS.minSampleRate, RENDER_LIMITS.maxSampleRate, 'sampleRate');
   if (!Number.isInteger(sampleRate)) throw new TypeError('sampleRate must be an integer.');
@@ -186,7 +207,6 @@ export async function renderScore(score, { sampleRate = 44100, mix = {}, project
   const reverb = expandedScore.master.reverb > 0 ? new Reverb(sampleRate, { room: 0.75 }) : null;
   const compressor = new Compressor(sampleRate, { threshold: -12, ratio: 2, knee: 6, makeupDb: 0 });
   const left = new Float32Array(BLOCK), right = new Float32Array(BLOCK), send = new Float32Array(BLOCK);
-  let limited = 0;
   for (let offset = 0; offset < lastFrame; offset += BLOCK) {
     const count = Math.min(BLOCK, lastFrame - offset);
     left.fill(0); right.fill(0); send.fill(0);
@@ -227,22 +247,23 @@ export async function renderScore(score, { sampleRate = 44100, mix = {}, project
       // File edges follow the complete musical timeline, not an excerpt boundary.
       const time = (offset + i) / sampleRate;
       const fade = Math.max(0, Math.min(1, time / 0.004, (duration - time - 1 / sampleRate) / 0.04));
-      for (let ch = 0; ch < 2; ch++) {
-        const value = (ch ? right[i] : left[i]) * controls.volume * fade;
-        if (Math.abs(value) > ceiling) limited++;
-        channels[ch][frame] = Math.max(-ceiling, Math.min(ceiling, value));
-      }
+      channels[0][frame] = left[i] * fade;
+      channels[1][frame] = right[i] * fade;
     }
     if (offset % (BLOCK * 64) === 0) { check('rendering', Math.min(end, (offset + count) / sampleRate)); await yieldTurn(); }
   }
+  const mastered = masterInPlace(channels, sampleRate, { volume: controls.volume / DEFAULT_MASTER_VOLUME });
   const report = analyzeAudio(channels, sampleRate);
   report.from = from;
   report.to = end;
   report.sections = expandedScore.sections.map(s => ({ ...s, time: s.beat * beatSeconds, duration: s.beats * beatSeconds }));
-  report.limitedFraction = limited / (frames * 2);
+  report.suggestions = arrangementSuggestions(expandedScore);
+  report.loudness = mastered.loudness;
+  report.loudnessGainDb = mastered.gainDb;
+  report.limitedFraction = mastered.limited;
   report.warnings = technicalWarnings(report);
-  if (report.limitedFraction > 0.001) report.warnings.push('The safety ceiling flattened more than 0.1% of samples. Lower part or master levels and render again.');
-  report.stemDescription = 'Dry stereo buses after part volume, pan and mute/solo, before shared master reverb, compression, volume and safety limiting. They do not sum to the mastered render.';
+  if (report.limitedFraction > 0.01) report.warnings.push({ code: 'squashed', message: 'The limiter turns more than 1% of the track down by over 3 dB, so loud moments sound squashed. Lower the loudest parts, usually drums or bass, and render again.' });
+  report.stemDescription = 'Dry stereo buses after part volume, pan and mute/solo, before the shared master reverb, compression, loudness matching and limiter. They do not sum to the mastered render.';
   check('complete', end);
   return { audio: audioBuffer(channels, sampleRate), report, parts: expandedScore.parts.map(({ id, name, color }) => ({ id, name, color })), ...(stemBuffers ? { stems: Object.fromEntries(Object.entries(stemBuffers).map(([id, data]) => [id, audioBuffer(data, sampleRate)])) } : {}), expandedScore };
 }

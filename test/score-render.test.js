@@ -146,8 +146,11 @@ test('mute, solo, pan, part/master gain and dry stems materially affect the mix'
   assert.equal(silent.report.peak, 0); assert.equal(silent.stems.keys.getChannelData(0).some(v => v !== 0), false);
   const reduced = await renderScore(score, { ...options, mix: { master: { volume: 0.4 } } });
   assert.ok(Math.abs(reduced.report.rms / full.report.rms - 0.5) < 0.001);
-  const quieterPart = await renderScore(score, { ...options, mix: { parts: { keys: { volume: 0.1 } } } });
-  assert.ok(quieterPart.report.rms < full.report.rms);
+  // A quieter part changes the balance; the master then brings the whole render back to the same loudness.
+  const quieterPart = await renderScore(score, { ...options, stems: true, mix: { parts: { keys: { volume: 0.1 } } } });
+  const stemRms = r => { const data = r.stems.keys.getChannelData(0); return Math.sqrt(data.reduce((n, x) => n + x * x, 0) / data.length); };
+  assert.ok(stemRms(quieterPart) < stemRms(full) * 0.2);
+  assert.ok(changed(samples(full), samples(quieterPart)));
   const left = await renderScore(score, { ...options, mix: { parts: { keys: { solo: true, pan: -1 } } } });
   assert.ok(left.audio.getChannelData(0).some(v => v !== 0)); assert.ok(left.audio.getChannelData(1).every(v => Math.abs(v) < 1e-12));
   assert.deepEqual(Object.keys(full.stems), ['keys', 'low']);

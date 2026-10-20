@@ -33,7 +33,7 @@ Read the person's words and decide the normal things yourself: style, tempo, ins
 
 ## Making a track, step by step
 
-1. **Learn the format.** Read [docs/composing.md](docs/composing.md) and [docs/musical-directions.md](docs/musical-directions.md). Run `node bin/soundroo.js catalog` for the instruments and their settings. [examples/streetlight-funk.json](examples/streetlight-funk.json) is a complete lively track; study its shape, then write your own music.
+1. **Learn the format.** Read [docs/composing.md](docs/composing.md) and [docs/musical-directions.md](docs/musical-directions.md). Run `node bin/soundroo.js catalog` for the instruments and their settings. Run `node bin/soundroo.js example` to list the example tracks by genre, then print the one closest to the request (`node bin/soundroo.js example hotwire-boogie`) and study how it opens, builds and ends. Write your own music; soundroo.com refuses copies of the examples.
 
 2. **Create a library.** One library per collection, under `library/`:
 
@@ -60,7 +60,7 @@ Read the person's words and decide the normal things yourself: style, tempo, ins
    node bin/soundroo.js render --all --library library/<name> --json
    ```
 
-   Read the report. Fix clipping, silence and big level jumps. If `limitedFraction` has a warning, lower the levels instead of accepting a squashed mix. Check that the track has a real ending. These checks find technical problems; they can't tell you whether it sounds good. You can't hear the music, so don't claim it sounds great.
+   Read the report. Fix every warning. Act on the `suggestions` too (drums that come in late, four bars that repeat unchanged for too long, sections that all sound the same, a long silent ending) unless the person asked for exactly that. Every render is mastered to the same loudness, so don't raise the master volume to make it louder. These checks find technical and arrangement problems; they can't tell you whether it sounds good. You can't hear the music, so don't claim it sounds great.
 
 6. **Open the player.** Start the studio in a session that keeps running, and don't stop it while the person listens:
 

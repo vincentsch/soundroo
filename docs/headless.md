@@ -51,7 +51,7 @@ const fingerprint = soundroo.fingerprint(score);             // 'fp1:…'
 | `speech` | `{cacheDir, synthesize, modelDir, offline, log}` for speech recipes. |
 | `progress`, `signal` | Progress callback and AbortSignal, as in `renderScore`. |
 
-`wav` is a 16-bit stereo PCM WAV `Buffer`. The report contains duration, sample rate, peak and RMS (linear and dBFS), clipped and non-finite sample counts, silent fraction, a 360-point peak waveform, section times, `limitedFraction`, warnings, `revision` and `source`. Signal measurements diagnose problems; they do not judge music.
+`wav` is a 16-bit stereo PCM WAV `Buffer`. The report contains duration, sample rate, peak and RMS (linear and dBFS), clipped and non-finite sample counts, silent fraction, a 360-point peak waveform, section times, `loudness` (integrated LUFS after mastering), `loudnessGainDb`, `limitedFraction` (share of the track the limiter turns down by more than 3 dB), warnings, arrangement `suggestions`, `revision` and `source`. Signal measurements diagnose problems; they do not judge music.
 
 Errors:
 
