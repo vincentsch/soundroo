@@ -15,6 +15,7 @@ type Artist struct {
 	Name       string `json:"name"`
 	URL        string `json:"url"`
 	IsOfficial bool   `json:"isOfficial,omitempty"`
+	Status     string `json:"status,omitempty"`
 }
 
 // TrackRef is a track as collection and release responses describe it.

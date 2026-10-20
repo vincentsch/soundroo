@@ -97,10 +97,10 @@ For an update, both choices start as **Unchanged**: each track keeps what is set
 ## Remix an open track
 
 ```bash
-node bin/soundroo.js import https://soundroo.com/t/TRACK-ID --library library/my-music
+node bin/soundroo.js import https://soundroo.com/@artist/track-name --library library/my-music
 ```
 
-Import downloads the exact score and mix the artist shared and checks them against the service's revision. It adds the track under a free id and records the credit, license and original track in `tracks/<id>/source.json`. Credit the artist when you share or play the remix for others. Listen-only tracks have no score to import. `--dry-run` checks the link and says what it would download; nothing is downloaded or saved.
+Use the track page's address or its short link (`https://soundroo.com/t/TRACK-ID`). Import downloads the exact score and mix the artist shared and checks them against the service's revision. It adds the track under a free id and records the credit, license and original track in `tracks/<id>/source.json`. Credit the artist when you share or play the remix for others. Listen-only tracks have no score to import. `--dry-run` checks the link and says what it would download; nothing is downloaded or saved.
 
 Change the music before sharing it: an unchanged copy is refused. A changed remix shares with a link to the original.
 

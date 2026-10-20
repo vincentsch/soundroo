@@ -229,6 +229,14 @@ func (f *fakeService) serve(w http.ResponseWriter, r *http.Request) {
 
 func (f *fakeService) authed(w http.ResponseWriter, r *http.Request, path string, body []byte) {
 	if r.Method == "GET" {
+		if strings.HasPrefix(path, "/artists/mara/tracks/") {
+			if path != "/artists/mara/tracks/night-train" {
+				message(w, 404, "Not Found")
+				return
+			}
+			writeJSON(w, 200, map[string]any{"data": map[string]any{"id": "01JABCDEFGHJKMNPQRSTVWXYZ0", "title": "Night Train"}})
+			return
+		}
 		if m := regexp.MustCompile(`^/tracks/([0-9A-Z]{26})/score$`).FindStringSubmatch(path); m != nil {
 			if f.scoreBody == "" || strings.HasPrefix(m[1], "L") {
 				message(w, 404, "Not Found")

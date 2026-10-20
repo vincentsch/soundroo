@@ -14,15 +14,18 @@ import { ShareError } from './errors.js';
 const PUBLIC_ID = /^[0-9A-Za-z]{26}$/;
 export const OPEN_LICENSES = ['CC-BY-4.0'];
 
+// Returns the track id, or the track page link (/@handle/slug) as given: the
+// service looks that up when the score is downloaded.
 export function trackReference(reference, origin) {
   const value = String(reference ?? '').trim();
   if (PUBLIC_ID.test(value)) return value;
   let url;
-  try { url = new URL(value); } catch { throw new ShareError('Name a track by its short link (…/t/ID) or its id.', { code: 'invalid_reference' }); }
+  try { url = new URL(value); } catch { throw new ShareError('Name a track by its link or its id.', { code: 'invalid_reference' }); }
   if (!sameOrigin(origin, url.href)) throw new ShareError(`That link is on ${url.origin}, not ${origin}.`, { code: 'other_service', hint: `Pass --service ${url.origin} to import from there.` });
   const parts = url.pathname.split('/').filter(Boolean);
   if (parts.length === 2 && parts[0] === 't' && PUBLIC_ID.test(parts[1])) return parts[1];
-  throw new ShareError('Use the track’s short link (…/t/ID) or its id; the track page shows both.', { code: 'invalid_reference' });
+  if (parts.length === 2 && /^@./.test(parts[0])) return `${url.origin}/${parts.join('/')}`;
+  throw new ShareError('Use the track’s page link (…/@artist/track), its short link (…/t/ID) or its id.', { code: 'invalid_reference' });
 }
 
 // A service that decoded JSON objects into lists turns {} into [] and maps
@@ -62,13 +65,15 @@ function uniqueId(directory, wanted, title) {
 export async function importTrack(directory, reference, { service, env = process.env, fetchImpl, onProgress = () => {}, dryRun = false } = {}) {
   directory = libraryPath(directory);
   const origin = serviceOrigin(service, env);
-  const id = trackReference(reference, origin);
+  const wanted = trackReference(reference, origin);
+  const pageLink = !PUBLIC_ID.test(wanted);
   // A dry run checks the link and says what would happen: nothing is
   // downloaded, and the library is not created or changed.
   if (dryRun) {
+    const page = pageLink ? new URL(wanted).pathname.split('/').filter(Boolean) : null;
     return {
-      dryRun: true, service: origin, library: directory, remixOf: id, url: `${origin}/t/${id}`,
-      request: { method: 'GET', path: `/api/v1/tracks/${id}/score` },
+      dryRun: true, service: origin, library: directory, remixOf: pageLink ? null : wanted, url: pageLink ? wanted : `${origin}/t/${wanted}`,
+      request: pageLink ? { method: 'GET', path: `/api/v1/artists/${page[0].slice(1)}/tracks/${page[1]}`, then: 'GET /api/v1/tracks/ID/score' } : { method: 'GET', path: `/api/v1/tracks/${wanted}/score` },
       libraryExists: fs.existsSync(path.join(directory, 'collection.json')),
       tool: toolStatus(origin, env, 'import'),
       changes: 'none',
@@ -76,7 +81,8 @@ export async function importTrack(directory, reference, { service, env = process
   }
   const { cloud } = await connect(origin, { env, fetchImpl, onProgress });
   onProgress({ stage: 'downloading-score' });
-  const shared = await cloud(['score', id]);
+  const shared = await cloud(['score', wanted]);
+  const id = PUBLIC_ID.test(shared.trackId ?? '') ? shared.trackId : wanted;
   if (!OPEN_LICENSES.includes(shared.license)) throw new ShareError('The service did not offer this track under an open license, so it is not imported.', { code: 'not_open', exitCode: 4 });
   if (!shared.score || typeof shared.score !== 'object' || Array.isArray(shared.score)) throw new ShareError('The service sent no score for this track.', { code: 'bad_response', exitCode: 2 });
   const { score, mix } = normalizeImported(shared.score, shared.mix);

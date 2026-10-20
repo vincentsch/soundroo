@@ -30,7 +30,8 @@ test('lists made from JSON objects are turned back into objects', () => {
   assert.equal(trackReference('01JORIGINAL000000000000001', 'https://soundroo.com'), '01JORIGINAL000000000000001');
   assert.equal(trackReference('https://soundroo.com/t/01JORIGINAL000000000000001', 'https://soundroo.com'), '01JORIGINAL000000000000001');
   assert.throws(() => trackReference('https://other.example/t/01JORIGINAL000000000000001', 'https://soundroo.com'), error => error.code === 'other_service');
-  assert.throws(() => trackReference('https://soundroo.com/@mara/night-train', 'https://soundroo.com'), error => error.code === 'invalid_reference');
+  assert.equal(trackReference('https://soundroo.com/@mara/night-train?ref=x', 'https://soundroo.com'), 'https://soundroo.com/@mara/night-train');
+  assert.throws(() => trackReference('https://soundroo.com/@mara', 'https://soundroo.com'), error => error.code === 'invalid_reference');
 });
 
 test('an open track arrives exactly, credited, with a safe id and remix lineage', { skip }, async () => {

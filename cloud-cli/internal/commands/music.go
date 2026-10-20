@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -82,7 +83,7 @@ var (
 		Summary:     "Download an open track's score, mix and credit",
 		GroupID:     "music",
 		OutputModes: []string{rungrad.OutputModeHuman, rungrad.OutputModeJSON},
-		Examples:    []string{"soundroo-cloud score 01JABCDEFGHJKMNPQRSTVWXYZ0 --json", "soundroo-cloud score https://soundroo.com/t/01JABCDEFGHJKMNPQRSTVWXYZ0 --json"},
+		Examples:    []string{"soundroo-cloud score 01JABCDEFGHJKMNPQRSTVWXYZ0 --json", "soundroo-cloud score https://soundroo.com/t/01JABCDEFGHJKMNPQRSTVWXYZ0 --json", "soundroo-cloud score https://soundroo.com/@mara/night-train --json"},
 		Related:     []string{"soundroo-cloud track show"},
 	}
 )
@@ -120,6 +121,26 @@ func resourceID(o, value, kind, short string) (string, error) {
 	return "", &cloud.Error{Code: "invalid_id", Exit: cloud.ExitUsage, Message: fmt.Sprintf("%q is not a %s id or short link.", value, kind)}
 }
 
+// trackID accepts what resourceID does and also a track page link
+// (/@handle/slug), which the service looks up.
+func trackID(ctx context.Context, c *cloud.Client, o, value string) (string, error) {
+	value = strings.TrimSpace(value)
+	if u, err := url.Parse(value); err == nil && u.Scheme != "" && u.Host != "" && cloud.SameOrigin(o, value) {
+		parts := strings.Split(strings.Trim(u.Path, "/"), "/")
+		if len(parts) == 2 && len(parts[0]) > 1 && parts[0][0] == '@' {
+			var t cloud.TrackRef
+			if _, err := c.Resource(ctx, cloud.Request{Method: "GET", Path: "/artists/" + url.PathEscape(parts[0][1:]) + "/tracks/" + url.PathEscape(parts[1]), Retry: true}, &t); err != nil {
+				return "", err
+			}
+			if !cloud.PublicID.MatchString(t.ID) {
+				return "", &cloud.Error{Code: "bad_response", Exit: cloud.ExitAPI, Message: "The service sent no track for that link."}
+			}
+			return t.ID, nil
+		}
+	}
+	return resourceID(o, value, "track", "t")
+}
+
 func (m musicModule) trackShow() *rungrad.Command {
 	return &rungrad.Command{
 		Use:         "show <track>",
@@ -134,11 +155,11 @@ func (m musicModule) trackShow() *rungrad.Command {
 			if err != nil {
 				return err
 			}
-			id, err := resourceID(o, args[0], "track", "t")
+			c := m.e.client(f, o, m.e.optionalKey(f, o))
+			id, err := trackID(runContext(cmd), c, o, args[0])
 			if err != nil {
 				return err
 			}
-			c := m.e.client(f, o, m.e.optionalKey(f, o))
 			var t cloud.TrackRef
 			if _, err := c.Resource(runContext(cmd), cloud.Request{Method: "GET", Path: "/tracks/" + id, Retry: true}, &t); err != nil {
 				return err
@@ -475,13 +496,13 @@ a library; this command only prints it.`,
 			if err != nil {
 				return err
 			}
-			id, err := resourceID(o, args[0], "track", "t")
-			if err != nil {
-				return err
-			}
 			c := m.e.client(f, o, m.e.optionalKey(f, o))
+			id, err := trackID(runContext(cmd), c, o, args[0])
 			var s cloud.Score
-			if _, err := c.JSON(runContext(cmd), cloud.Request{Method: "GET", Path: "/tracks/" + id + "/score", Retry: true}, &s); err != nil {
+			if err == nil {
+				_, err = c.JSON(runContext(cmd), cloud.Request{Method: "GET", Path: "/tracks/" + id + "/score", Retry: true}, &s)
+			}
+			if err != nil {
 				var apiErr *cloud.Error
 				if errors.As(err, &apiErr) && apiErr.Exit == cloud.ExitNotFound {
 					apiErr.Message = "That track's score is not available: it does not exist, is listen-only, or is not shared with you."

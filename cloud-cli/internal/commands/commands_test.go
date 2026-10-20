@@ -417,6 +417,23 @@ func TestReleaseShowWaitsForRendering(t *testing.T) {
 	}
 }
 
+func TestLogoutLeavesOutTheClaimLinkOnceTheGuestWasKept(t *testing.T) {
+	svc := newFakeService(t)
+	h := newHarness(t)
+	if res := h.run("publish", "--payload", writePayload(t, samplePayload), "--rights-accepted", "--service", svc.URL()); res.Exit != 0 {
+		t.Fatal(res.Stderr)
+	}
+	svc.mu.Lock()
+	for _, u := range svc.tokens {
+		u.Status = "active"
+	}
+	svc.mu.Unlock()
+	res := h.run("logout", "--confirm", "--service", svc.URL())
+	if res.Exit != 0 || strings.Contains(res.Stdout, "/claim/") || !strings.Contains(res.Stdout, "already kept") {
+		t.Fatalf("logout after a claim: %d\n%s%s", res.Exit, res.Stdout, res.Stderr)
+	}
+}
+
 func TestDeviceLoginStoresAccountKeyAndKeepsGuestClaim(t *testing.T) {
 	svc := newFakeService(t)
 	svc.deviceSequence = []string{"pending", "slow_down", "rfc_pending", "ok"}
@@ -612,6 +629,13 @@ func TestScoreKeepsServiceJSONExactly(t *testing.T) {
 	}
 	if res := h.run("score", "L1JABCDEFGHJKMNPQRSTVWXYZ0", "--json", "--service", svc.URL()); res.Exit != 5 {
 		t.Fatalf("listen-only score: %d %s", res.Exit, res.Stderr)
+	}
+	page := h.run("score", svc.URL()+"/@mara/night-train", "--json", "--service", svc.URL())
+	if page.Exit != 0 || decodeJSON(t, page.Stdout)["trackId"] != "01JABCDEFGHJKMNPQRSTVWXYZ0" {
+		t.Fatalf("score by page link: %d %s", page.Exit, page.Stderr)
+	}
+	if res := h.run("score", svc.URL()+"/@mara/missing", "--json", "--service", svc.URL()); res.Exit != 5 {
+		t.Fatalf("unknown page link: %d %s", res.Exit, res.Stderr)
 	}
 }
 

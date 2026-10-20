@@ -698,6 +698,7 @@ type logoutResult struct {
 	Revoked      bool   `json:"revoked"`
 	Revocation   string `json:"revocation"`
 	GuestClaim   string `json:"guestClaimUrl,omitempty"`
+	GuestKept    bool   `json:"guestKept,omitempty"`
 	EnvKeyActive bool   `json:"envKeyActive,omitempty"`
 }
 
@@ -757,8 +758,17 @@ stored by this tool; unset the variable yourself.`,
 			}
 			f.RegisterSecret(stored.Token)
 			account, _, _ := st.Account()
+			guestClaim := account.Kind == store.KindGuest
 			if !localOnly {
 				c := m.e.client(f, o, stored.Token)
+				if guestClaim {
+					// A guest is usually kept from an email link on the website, which this computer
+					// never hears about; ask before repeating a claim link that no longer matters.
+					var me cloud.Me
+					if _, err := c.JSON(runContext(cmd), cloud.Request{Method: "GET", Path: "/me"}, &me); err == nil && me.Artist.Status != "" && me.Artist.Status != "guest" {
+						guestClaim, result.GuestKept = false, true
+					}
+				}
 				_, rerr := c.Do(runContext(cmd), cloud.Request{Method: "DELETE", Path: "/auth/token"})
 				var apiErr *cloud.Error
 				switch {
@@ -780,7 +790,7 @@ stored by this tool; unset the variable yourself.`,
 				return &cloud.Error{Code: "credentials_unwritable", Exit: cloud.ExitAPI, Message: "Could not remove the stored key: " + err.Error()}
 			}
 			result.Removed = removed
-			if account.Kind == store.KindGuest {
+			if guestClaim {
 				result.GuestClaim = account.ClaimURL
 			}
 			return f.WriteResult(result, func(w io.Writer) { renderLogout(w, result) })
@@ -800,6 +810,9 @@ func renderLogout(w io.Writer, r logoutResult) {
 		fmt.Fprintf(w, "Removed the key from this computer for %s. This service cannot revoke keys from the command line; revoke it in your account settings if needed.\n", r.Service)
 	default:
 		fmt.Fprintf(w, "Removed the key from this computer for %s without contacting the service.\n", r.Service)
+	}
+	if r.GuestKept {
+		fmt.Fprintln(w, "That artist page is already kept in a Soundroo account, so no claim link is needed.")
 	}
 	if r.GuestClaim != "" {
 		fmt.Fprintf(w, "To keep the music of that guest artist, open its claim link while signed in to your Soundroo account.\nSave it now: this computer no longer keeps it, and it is private:\n  %s\n", r.GuestClaim)

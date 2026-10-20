@@ -122,7 +122,7 @@ A part can't share a WAV from the library's `assets/` folder on soundroo.com. Us
 ## Remixing an open track
 
 ```bash
-node bin/soundroo.js import https://soundroo.com/t/<id> --library library/<name> --json
+node bin/soundroo.js import <track page link or short link> --library library/<name> --json
 ```
 
 This adds the exact shared score with its credit in `tracks/<id>/source.json`. Change the music before sharing the remix; an unchanged copy is refused. A shared remix links back to the original.
