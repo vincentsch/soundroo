@@ -123,6 +123,11 @@ renders **Turn It Up**, ten example tracks from rock and roll to dance-pop,
 UK garage and hyperpop. Then start your agent in the `soundroo` folder and ask
 for a track. It follows [AGENTS.md](AGENTS.md).
 
+To only listen and play with the studio, you can skip the clone:
+`npx soundroo start` keeps its music in a `library` folder where you run it.
+Agents work best with the cloned folder, because they read AGENTS.md and the
+docs there.
+
 Useful commands:
 
 ```bash
