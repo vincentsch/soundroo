@@ -110,6 +110,9 @@ func (s Store) Key() (token, source string, err error) {
 			return value, SourceEnv, nil
 		}
 	}
+	if err := s.adoptFormer(); err != nil {
+		return "", SourceNone, err
+	}
 	cred, err := s.Config.LoadCredential(s.Origin)
 	if err != nil {
 		return "", SourceNone, err
@@ -122,6 +125,9 @@ func (s Store) Key() (token, source string, err error) {
 
 // StoredKey returns only the stored key, ignoring the environment.
 func (s Store) StoredKey() (config.Credential, error) {
+	if err := s.adoptFormer(); err != nil {
+		return config.Credential{}, err
+	}
 	return s.Config.LoadCredential(s.Origin)
 }
 
@@ -142,6 +148,9 @@ func (s Store) Save(token string, account Account) error {
 
 // Account returns the stored account facts for this origin.
 func (s Store) Account() (Account, bool, error) {
+	if err := s.adoptFormer(); err != nil {
+		return Account{}, false, err
+	}
 	sc, err := s.readSidecar()
 	if err != nil {
 		return Account{}, false, err
@@ -162,6 +171,9 @@ func (s Store) UpdateAccount(change func(*Account)) error {
 
 // Remove deletes the stored key and account facts for this origin only.
 func (s Store) Remove() (bool, error) {
+	if err := s.adoptFormer(); err != nil {
+		return false, err
+	}
 	path, err := s.Config.CredentialsPath()
 	if err != nil {
 		return false, err
@@ -209,6 +221,9 @@ func (s Store) SavePendingLogin(p PendingLogin) error {
 
 // PendingLogin returns the started device login for this origin.
 func (s Store) PendingLogin() (PendingLogin, bool, error) {
+	if err := s.adoptFormer(); err != nil {
+		return PendingLogin{}, false, err
+	}
 	sc, err := s.readSidecar()
 	if err != nil {
 		return PendingLogin{}, false, err
@@ -220,6 +235,73 @@ func (s Store) PendingLogin() (PendingLogin, bool, error) {
 // ClearPendingLogin forgets the device login for this origin.
 func (s Store) ClearPendingLogin() error {
 	return s.updateSidecar(func(sc *sidecar) { delete(sc.PendingLogins, s.Origin) })
+}
+
+// formerOrigins maps an origin to the one it replaced: soundroo.com moved to
+// www.soundroo.com, and keys saved before that belong to the new origin.
+var formerOrigins = map[string]string{"https://www.soundroo.com": "https://soundroo.com"}
+
+// adoptFormer moves the key, account facts and pending login stored for the
+// replaced origin to this one, once, when nothing is stored here yet.
+func (s Store) adoptFormer() error {
+	former, ok := formerOrigins[s.Origin]
+	if !ok {
+		return nil
+	}
+	path, err := s.Config.CredentialsPath()
+	if err != nil {
+		return err
+	}
+	var file credentialsFile
+	data, err := os.ReadFile(path)
+	switch {
+	case errors.Is(err, os.ErrNotExist):
+	case err != nil:
+		return err
+	default:
+		if err := json.Unmarshal(data, &file); err != nil {
+			return fmt.Errorf("the credentials file %s is not valid JSON", path)
+		}
+	}
+	sc, err := s.readSidecar()
+	if err != nil {
+		return err
+	}
+	_, hasKey := file.Entries[s.Origin]
+	_, hasAccount := sc.Accounts[s.Origin]
+	_, hasLogin := sc.PendingLogins[s.Origin]
+	if hasKey || hasAccount || hasLogin {
+		return nil
+	}
+	if cred, ok := file.Entries[former]; ok {
+		file.Entries[s.Origin] = cred
+		delete(file.Entries, former)
+		if file.Version == 0 {
+			file.Version = 1
+		}
+		encoded, err := json.MarshalIndent(file, "", "  ")
+		if err != nil {
+			return err
+		}
+		if err := writeAtomic(path, encoded); err != nil {
+			return err
+		}
+	}
+	account, movesAccount := sc.Accounts[former]
+	login, movesLogin := sc.PendingLogins[former]
+	if !movesAccount && !movesLogin {
+		return nil
+	}
+	return s.updateSidecar(func(sc *sidecar) {
+		if movesAccount {
+			sc.Accounts[s.Origin] = account
+			delete(sc.Accounts, former)
+		}
+		if movesLogin {
+			sc.PendingLogins[s.Origin] = login
+			delete(sc.PendingLogins, former)
+		}
+	})
 }
 
 // SidecarPath is accounts.json beside the credentials file.

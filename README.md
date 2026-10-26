@@ -1,5 +1,5 @@
 <p align="center">
-  <a href="https://soundroo.com">
+  <a href="https://www.soundroo.com">
     <img src="web/favicon.svg" alt="" width="72">
   </a>
 </p>
@@ -12,19 +12,19 @@
 </p>
 
 <p align="center">
-  <a href="https://soundroo.com">Website</a> &nbsp;·&nbsp;
-  <a href="https://soundroo.com/docs">Docs</a> &nbsp;·&nbsp;
-  <a href="https://soundroo.com/make/custom">Prompt builder</a> &nbsp;·&nbsp;
+  <a href="https://www.soundroo.com">Website</a> &nbsp;·&nbsp;
+  <a href="https://www.soundroo.com/docs">Docs</a> &nbsp;·&nbsp;
+  <a href="https://www.soundroo.com/make/custom">Prompt builder</a> &nbsp;·&nbsp;
   <a href="AGENTS.md">AGENTS.md</a>
 </p>
 
 ![The Soundroo music player with the Turn It Up example collection](docs/studio.jpg)
 
-**Listen first:** the [Turn It Up](https://soundroo.com/@soundroo/collections/turn-it-up)
+**Listen first:** the [Turn It Up](https://www.soundroo.com/@soundroo/collections/turn-it-up)
 collection was written with this toolkit, from the
-[rock and roll boogie](https://soundroo.com/@soundroo/hotwire-boogie) to the
-[nu-disco funk](https://soundroo.com/@soundroo/mirrorball-shift) and
-[hyperpop](https://soundroo.com/@soundroo/pixel-riot).
+[rock and roll boogie](https://www.soundroo.com/@soundroo/hotwire-boogie) to the
+[nu-disco funk](https://www.soundroo.com/@soundroo/mirrorball-shift) and
+[hyperpop](https://www.soundroo.com/@soundroo/pixel-riot).
 
 ## Make a track
 
@@ -37,7 +37,7 @@ Copy this into your agent and put your idea where the brackets are:
 
 ```text
 Make me a track: [what it should sound like, or "surprise me"].
-Use Soundroo for it. If you have Soundroo tools, use them. If you can run commands, clone https://github.com/vincentsch/soundroo, read its AGENTS.md and follow the steps. If you can't do either, send me to https://soundroo.com/connect
+Use Soundroo for it. If you have Soundroo tools, use them. If you can run commands, clone https://github.com/vincentsch/soundroo, read its AGENTS.md and follow the steps. If you can't do either, send me to https://www.soundroo.com/connect
 ```
 
 A few words are enough, like "a fast funk track for a summer road trip" or
@@ -89,7 +89,7 @@ works offline.
 ## Share it on soundroo.com
 
 When your music is ready, the agent asks whether to put it on
-[soundroo.com](https://soundroo.com). If you say yes, it sends the score, and
+[soundroo.com](https://www.soundroo.com). If you say yes, it sends the score, and
 soundroo.com renders the audio with the same engine. You get links that play
 in any browser, to send to friends.
 
@@ -105,7 +105,7 @@ and every option.
 Chat apps can't run this toolkit, so soundroo.com has a connector for them, a
 remote MCP server. Add it once and sign in, then paste the same prompt into a
 chat. You get a link to a private preview of your track.
-[soundroo.com/connect](https://soundroo.com/connect) shows the steps.
+[soundroo.com/connect](https://www.soundroo.com/connect) shows the steps.
 
 ## Install it yourself
 

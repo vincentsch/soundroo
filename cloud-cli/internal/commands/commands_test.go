@@ -381,7 +381,7 @@ func TestRedirectToAnotherOriginIsRefused(t *testing.T) {
 
 func TestInvalidServiceOriginsAreUsageErrors(t *testing.T) {
 	h := newHarness(t)
-	for _, value := range []string{"http://example.com", "ftp://soundroo.com", "https://user:pw@soundroo.com", "https://soundroo.com/api", "https://soundroo.com?x=1"} {
+	for _, value := range []string{"http://example.com", "ftp://soundroo.com", "https://user:pw@soundroo.com", "https://www.soundroo.com/api", "https://www.soundroo.com?x=1"} {
 		res := h.run("auth", "status", "--json", "--service", value)
 		if res.Exit != 1 {
 			t.Fatalf("%s accepted: %d %s", value, res.Exit, res.Stderr)

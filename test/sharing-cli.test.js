@@ -11,9 +11,9 @@ import * as engine from '../src/headless.js';
 import { makeLibrary, markRendered, score, installStub, releaseAnswer, tempDir, snapshot, posix } from './fixtures/sharing.js';
 
 const skip = !posix && 'the soundroo-cloud stand-in needs a POSIX shebang';
-const origin = 'https://soundroo.com';
+const origin = 'https://www.soundroo.com';
 // The stored key the first share created, as soundroo-cloud reports it.
-const guestKey = { service: origin, key: { present: true, source: 'file', kind: 'guest', artist: { handle: 'amber-orchard' }, claimUrl: 'https://soundroo.com/claim/again' } };
+const guestKey = { service: origin, key: { present: true, source: 'file', kind: 'guest', artist: { handle: 'amber-orchard' }, claimUrl: 'https://www.soundroo.com/claim/again' } };
 
 async function run(command, { positional = [], options = {}, env }) {
   const out = [], err = [];
@@ -26,8 +26,8 @@ test('share publishes through soundroo-cloud and remembers links, not secrets', 
   const stub = installStub({ publish: releaseAnswer({ status: 'queued' }), 'release show': [releaseAnswer({ status: 'rendering' }), releaseAnswer({ status: 'ready', claimUrl: null })] });
   const result = await shareLibrary(directory, { env: stub.env, rightsAccepted: true, intervalMs: 1 });
   assert.equal(result.status, 'ready');
-  assert.equal(result.claimUrl, 'https://soundroo.com/claim/secretclaimtoken');
-  assert.equal(result.collection.shortUrl, 'https://soundroo.com/c/01JCOLLECTION0000000000001');
+  assert.equal(result.claimUrl, 'https://www.soundroo.com/claim/secretclaimtoken');
+  assert.equal(result.collection.shortUrl, 'https://www.soundroo.com/c/01JCOLLECTION0000000000001');
   assert.deepEqual(result.tracks.map(t => [t.localId, t.status]), [['night-train', 'ready'], ['city-lights', 'ready']]);
   const calls = stub.calls();
   assert.deepEqual(calls.map(c => c.command), ['version', 'publish', 'release show', 'release show']);
@@ -43,7 +43,7 @@ test('share publishes through soundroo-cloud and remembers links, not secrets', 
   assert.equal(sent.rightsAccepted, true);
   const stored = state.services[origin];
   assert.equal(stored.collection.id, '01JCOLLECTION0000000000001');
-  assert.equal(stored.tracks['night-train'].shortUrl, 'https://soundroo.com/t/01JTRACK000000000000000000');
+  assert.equal(stored.tracks['night-train'].shortUrl, 'https://www.soundroo.com/t/01JTRACK000000000000000000');
   assert.equal(stored.lastRelease.status, 'ready');
   assert.equal(stored.pending, undefined);
   const text = fs.readFileSync(sharingPath(directory), 'utf8');
@@ -52,10 +52,10 @@ test('share publishes through soundroo-cloud and remembers links, not secrets', 
 
 test('a failed request is retried with the same key; changed music gets a new key', { skip }, async () => {
   const directory = await makeLibrary();
-  const stub = installStub({ publish: [{ fail: { exit: 2, code: 'network', error: 'Could not reach https://soundroo.com: connection reset.' } }, releaseAnswer({ status: 'ready' })] });
+  const stub = installStub({ publish: [{ fail: { exit: 2, code: 'network', error: 'Could not reach https://www.soundroo.com: connection reset.' } }, releaseAnswer({ status: 'ready' })] });
   const failed = await run('share', { options: { library: directory, 'rights-accepted': true, json: true }, env: stub.env });
   assert.equal(failed.code, 2);
-  assert.deepEqual(failed.json, { error: 'Could not reach https://soundroo.com: connection reset.', code: 'network', exitCode: 2 });
+  assert.deepEqual(failed.json, { error: 'Could not reach https://www.soundroo.com: connection reset.', code: 'network', exitCode: 2 });
   const pending = readSharing(directory).services[origin].pending;
   assert.match(pending.idempotencyKey, /^sr1-[a-f0-9]{24}-[a-f0-9]{12}$/);
   const keyOf = call => call.argv[call.argv.indexOf('--idempotency-key') + 1];
@@ -86,7 +86,7 @@ test('sharing unchanged music again sends nothing new', { skip }, async () => {
   const again = await run('share', { options: { library: directory, 'rights-accepted': true, json: true }, env: stub.env });
   assert.equal(again.code, 0);
   assert.equal(again.json.unchanged, true);
-  assert.equal(again.json.claimUrl, 'https://soundroo.com/claim/again');
+  assert.equal(again.json.claimUrl, 'https://www.soundroo.com/claim/again');
   // The protocol check already ran in this process; no publish happens.
   assert.deepEqual(stub.calls().map(c => c.command), ['auth status', 'collection show', 'release show']);
   const forced = await run('share', { options: { library: directory, 'rights-accepted': true, json: true, force: true, 'no-wait': true }, env: stub.env });
@@ -124,13 +124,13 @@ test('a full unclaimed page asks to claim it by email instead of making another 
   assert.equal(result.json.code, 'claim_required');
   assert.equal(result.json.serviceCode, 'claim_required');
   assert.equal(result.json.error, message);
-  assert.equal(result.json.claimUrl, 'https://soundroo.com/claim/again');
+  assert.equal(result.json.claimUrl, 'https://www.soundroo.com/claim/again');
   assert.match(result.json.hint, /node bin\/soundroo\.js claim --email you@example\.com/);
   assert.deepEqual(stub.calls().map(c => c.command), ['version', 'publish', 'auth status']);
   const human = await run('share', { options: { library: directory, 'rights-accepted': true }, env: stub.env });
   assert.equal(human.code, 4);
   const text = human.err.join('\n');
-  assert.ok(text.includes(`Soundroo: ${message}`) && text.includes('claim --email') && text.includes('https://soundroo.com/claim/again'), text);
+  assert.ok(text.includes(`Soundroo: ${message}`) && text.includes('claim --email') && text.includes('https://www.soundroo.com/claim/again'), text);
   assert.ok(!stub.calls().some(c => c.argv.includes('--no-guest') || c.command === 'login'), 'no other identity is created');
 });
 
@@ -180,7 +180,7 @@ test('an update stops before publishing when this computer cannot update the sha
   let result = await share(directory, stub);
   assert.equal(result.code, 3);
   assert.equal(result.json.code, 'key_missing');
-  assert.match(result.json.error, /shared on soundroo\.com as @amber-orchard/);
+  assert.match(result.json.error, /shared on www\.soundroo\.com as @amber-orchard/);
   assert.match(result.json.hint, /claim link while signed in/);
   assert.match(result.json.hint, /node bin\/soundroo\.js login/);
   assert.doesNotMatch(result.json.hint, /logout --confirm|new guest/);
@@ -191,17 +191,17 @@ test('an update stops before publishing when this computer cannot update the sha
 
   // An account connected before claiming the guest page: its saved claim link is the way back.
   stub = installStub({
-    'auth status': { service: origin, key: { present: true, source: 'file', kind: 'account', artist: { handle: 'mara' }, formerGuest: { artist: { handle: 'amber-orchard' }, claimUrl: 'https://soundroo.com/claim/formerguest' } } },
+    'auth status': { service: origin, key: { present: true, source: 'file', kind: 'account', artist: { handle: 'mara' }, formerGuest: { artist: { handle: 'amber-orchard' }, claimUrl: 'https://www.soundroo.com/claim/formerguest' } } },
     'collection show': { ...collection, canEdit: false }, publish: releaseAnswer({ status: 'ready' }),
   });
   result = await share(directory, stub, { force: true });
   assert.equal(result.code, 4);
   assert.equal(result.json.code, 'artist_mismatch');
-  assert.equal(result.json.claimUrl, 'https://soundroo.com/claim/formerguest');
+  assert.equal(result.json.claimUrl, 'https://www.soundroo.com/claim/formerguest');
   assert.match(result.json.hint, /before connecting @mara/);
   assert.ok(!published(stub));
   const told = await run('share', { options: { library: directory, 'rights-accepted': true }, env: stub.env });
-  assert.ok(told.err.join('\n').includes('Claim link (private; whoever opens it can claim the page):\n  https://soundroo.com/claim/formerguest'), told.err.join('\n'));
+  assert.ok(told.err.join('\n').includes('Claim link (private; whoever opens it can claim the page):\n  https://www.soundroo.com/claim/formerguest'), told.err.join('\n'));
 
   // Once claimed, the account owns the collection, whatever its handle: the update goes ahead.
   stub.set({ 'auth status': { service: origin, key: { present: true, source: 'file', kind: 'account', artist: { handle: 'mara' } } }, 'collection show': { ...collection, artist: '@mara', canEdit: true }, publish: releaseAnswer({ status: 'ready' }) });
@@ -227,7 +227,7 @@ test('an update stops before publishing when this computer cannot update the sha
   result = await share(other, stub);
   assert.equal(result.code, 3);
   assert.equal(result.json.code, 'auth_invalid');
-  assert.equal(result.json.claimUrl, 'https://soundroo.com/claim/again');
+  assert.equal(result.json.claimUrl, 'https://www.soundroo.com/claim/again');
   assert.match(result.json.hint, /claim link below while signed in/);
   assert.doesNotMatch(result.json.hint, /logout --confirm|new guest/);
   assert.ok(!published(stub));
@@ -243,13 +243,13 @@ test('import, whoami and status refresh preview offline under --dry-run', { skip
     'release show': releaseAnswer({ status: 'ready' }),
   });
   const before = snapshot(directory);
-  const imported = await run('import', { positional: ['https://soundroo.com/t/01JTRACK000000000000000009'], options: { library: directory, 'dry-run': true, json: true }, env: stub.env });
+  const imported = await run('import', { positional: ['https://www.soundroo.com/t/01JTRACK000000000000000009'], options: { library: directory, 'dry-run': true, json: true }, env: stub.env });
   assert.equal(imported.code, 0);
   assert.deepEqual([imported.json.dryRun, imported.json.remixOf, imported.json.request.path, imported.json.libraryExists, imported.json.changes], [true, '01JTRACK000000000000000009', '/api/v1/tracks/01JTRACK000000000000000009/score', true, 'none']);
   const fresh = path.join(tempDir(), 'not-yet');
   const into = await run('import', { positional: ['01JTRACK000000000000000009'], options: { library: fresh, 'dry-run': true }, env: stub.env });
   assert.equal(into.code, 0);
-  assert.match(into.out[0], /^DRY RUN: would download the score of https:\/\/soundroo\.com\/t\/01JTRACK000000000000000009 and add it to .* \(a new library\)/);
+  assert.match(into.out[0], /^DRY RUN: would download the score of https:\/\/www\.soundroo\.com\/t\/01JTRACK000000000000000009 and add it to .* \(a new library\)/);
   assert.ok(!fs.existsSync(fresh), 'a dry run created the library');
   // An invalid link is still refused.
   assert.equal((await run('import', { positional: ['https://other.example/t/01JTRACK000000000000000009'], options: { library: directory, 'dry-run': true, json: true }, env: stub.env })).json.code, 'other_service');
@@ -259,7 +259,7 @@ test('import, whoami and status refresh preview offline under --dry-run', { skip
   assert.equal(status.code, 0);
   assert.deepEqual([status.json.dryRun, status.json.request.path, status.json.changes, status.json.lastRelease.status], [true, '/api/v1/releases/01JRELEASE0000000000000001', 'none', 'rendering']);
   const text = await run('share', { positional: ['status'], options: { library: directory, refresh: true, 'dry-run': true }, env: stub.env });
-  assert.match(text.out[0], /DRY RUN: --refresh would ask https:\/\/soundroo\.com/);
+  assert.match(text.out[0], /DRY RUN: --refresh would ask https:\/\/www\.soundroo\.com/);
   assert.deepEqual(stub.calls(), [], 'a dry run ran soundroo-cloud');
   assert.deepEqual(snapshot(directory), before, 'a dry run changed the library');
 });
@@ -278,7 +278,7 @@ test('dry runs of account commands work without installing anything', async () =
 
 test('whoami and status read through soundroo-cloud', { skip }, async () => {
   const directory = await makeLibrary();
-  const stub = installStub({ me: { service: origin, artist: { handle: 'amber-orchard', name: 'Amber Orchard', url: 'https://soundroo.com/@amber-orchard' }, collections: [] } });
+  const stub = installStub({ me: { service: origin, artist: { handle: 'amber-orchard', name: 'Amber Orchard', url: 'https://www.soundroo.com/@amber-orchard' }, collections: [] } });
   const me = await run('whoami', { options: { json: true }, env: stub.env });
   assert.equal(me.code, 0);
   assert.equal(me.json.artist.handle, 'amber-orchard');

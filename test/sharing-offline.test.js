@@ -34,7 +34,7 @@ test('composing, rendering, the studio and share previews never touch the networ
     ['share', '--library', library, '--dry-run', '--json'],
     ['share', 'status', '--library', library, '--json'],
     ['share', 'status', '--library', library, '--refresh', '--dry-run', '--json'],
-    ['import', 'https://soundroo.com/t/01JTRACK000000000000000009', '--library', library, '--dry-run', '--json'],
+    ['import', 'https://www.soundroo.com/t/01JTRACK000000000000000009', '--library', library, '--dry-run', '--json'],
     ['whoami', '--dry-run', '--json'],
     ['login', '--dry-run', '--json'],
     ['logout', '--dry-run', '--json'],

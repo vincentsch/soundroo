@@ -96,8 +96,8 @@ test('binaries come only from the configured origin', { skip: !key && 'no prebui
     assert.deepEqual(other.hits, [], 'another origin was contacted');
     const followed = await ensureBinary({ origin: sameRedirect.origin, env: { SOUNDROO_CACHE: tempDir() } });
     assert.equal(followed.source, 'download');
-    assert.throws(() => manifestEntry(JSON.parse(manifest({ url: 'https://evil.example/x' })), key, 'https://soundroo.com/downloads/cli/manifest.json', 'https://soundroo.com'), error => error.code === 'cross_origin_download');
-    assert.throws(() => manifestEntry({ name: 'other', protocol: 1, version: '1.0.0', platforms: {} }, key, 'https://soundroo.com/x', 'https://soundroo.com'), error => error.code === 'bad_manifest');
+    assert.throws(() => manifestEntry(JSON.parse(manifest({ url: 'https://evil.example/x' })), key, 'https://www.soundroo.com/downloads/cli/manifest.json', 'https://www.soundroo.com'), error => error.code === 'cross_origin_download');
+    assert.throws(() => manifestEntry({ name: 'other', protocol: 1, version: '1.0.0', platforms: {} }, key, 'https://www.soundroo.com/x', 'https://www.soundroo.com'), error => error.code === 'bad_manifest');
   } finally { await Promise.all([other.close(), pointing.close(), redirecting.close(), sameRedirect.close()]); }
 });
 
@@ -137,16 +137,16 @@ test('the toolkit runs the binary without a shell and checks its protocol', { sk
   fs.chmodSync(file, 0o755);
   fs.writeFileSync(path.join(dir, 'behavior.json'), JSON.stringify({ 'auth status': { service: 'x', key: { present: false } } }));
   const env = { ...process.env, SOUNDROO_CLOUD_BIN: file, STUB_DIR: dir };
-  const { cloud } = await connect('https://soundroo.com', { env });
+  const { cloud } = await connect('https://www.soundroo.com', { env });
   assert.deepEqual(await cloud(['auth', 'status']), { service: 'x', key: { present: false } });
   const calls = fs.readFileSync(path.join(dir, 'calls.jsonl'), 'utf8').trim().split('\n').map(line => JSON.parse(line));
   assert.deepEqual(calls[0].argv, ['version', '--json']);
-  assert.deepEqual(calls[1].argv, ['--service', 'https://soundroo.com', '--json', '--no-prompt', 'auth', 'status']);
+  assert.deepEqual(calls[1].argv, ['--service', 'https://www.soundroo.com', '--json', '--no-prompt', 'auth', 'status']);
   // A binary speaking another protocol is refused.
   const old = path.join(dir, 'old-cloud');
   fs.copyFileSync(STUB_SOURCE, old);
   fs.chmodSync(old, 0o755);
   fs.writeFileSync(path.join(dir, 'behavior.json'), JSON.stringify({ version: { name: 'soundroo-cloud', version: '9.0.0', protocol: 9 } }));
-  await assert.rejects(connect('https://soundroo.com', { env: { ...env, SOUNDROO_CLOUD_BIN: old } }), error => error.code === 'protocol_mismatch');
-  await assert.rejects(connect('https://soundroo.com', { env: { ...env, SOUNDROO_CLOUD_BIN: path.join(dir, 'missing') } }), error => error.code === 'binary_missing');
+  await assert.rejects(connect('https://www.soundroo.com', { env: { ...env, SOUNDROO_CLOUD_BIN: old } }), error => error.code === 'protocol_mismatch');
+  await assert.rejects(connect('https://www.soundroo.com', { env: { ...env, SOUNDROO_CLOUD_BIN: path.join(dir, 'missing') } }), error => error.code === 'binary_missing');
 });

@@ -5,12 +5,12 @@ import path from 'node:path';
 import { addTrack, saveMix, writeJson, trackPath, readJson } from '../src/project.js';
 import * as engine from '../src/headless.js';
 import { prepareRelease, inspectTrack, jsonProblems, canonicalBytes, surveyLibrary } from '../src/cloud/payload.js';
-import { readSharing, ensureLibraryUid, idempotencyFor, updateService, sharingPath } from '../src/cloud/state.js';
+import { readSharing, ensureLibraryUid, idempotencyFor, updateService, sharingPath, serviceState } from '../src/cloud/state.js';
 import { shareLibrary } from '../src/cloud/share.js';
-import { parseOrigin, resolveService } from '../src/cloud/origin.js';
+import { parseOrigin, resolveService, sameOrigin } from '../src/cloud/origin.js';
 import { makeLibrary, markRendered, score, tempDir, snapshot } from './fixtures/sharing.js';
 
-const origin = 'https://soundroo.com';
+const origin = 'https://www.soundroo.com';
 
 test('a release carries exactly the scores, current mixes and collection settings', async () => {
   const directory = await makeLibrary();
@@ -118,6 +118,18 @@ test('the library id is created once, and retries reuse their idempotency key', 
   assert.ok(!/token|claim|Bearer/i.test(text), 'sharing.json must not hold secrets');
 });
 
+test('a library shared on the bare domain keeps its record on www', async () => {
+  const directory = await makeLibrary();
+  ensureLibraryUid(directory);
+  const state = readSharing(directory);
+  writeJson(sharingPath(directory), { ...state, services: { 'https://soundroo.com': { lastRelease: { collectionUrl: 'https://soundroo.com/@amber/songs' } } } });
+  assert.equal(serviceState(readSharing(directory), 'https://www.soundroo.com').lastRelease.collectionUrl, 'https://soundroo.com/@amber/songs');
+  updateService(directory, 'https://www.soundroo.com', s => ({ ...s, pending: { payloadSha256: 'a'.repeat(64), idempotencyKey: 'sr1-moved-key' } }));
+  const moved = readSharing(directory).services;
+  assert.deepEqual(Object.keys(moved), ['https://www.soundroo.com']);
+  assert.equal(moved['https://www.soundroo.com'].lastRelease.collectionUrl, 'https://soundroo.com/@amber/songs');
+});
+
 test('updates keep visibility and access chosen on the service unless asked to change them', async () => {
   const directory = await makeLibrary();
   const known = { collection: { visibility: 'public' }, tracks: { 'night-train': { visibility: 'private', access: 'listen-only' } } };
@@ -155,11 +167,14 @@ test('a dry run reads the library and nothing else', async () => {
 });
 
 test('service origins need https except on this computer', () => {
-  assert.equal(parseOrigin('HTTPS://SoundRoo.com:443/'), 'https://soundroo.com');
+  assert.equal(parseOrigin('HTTPS://SoundRoo.com:443/'), 'https://www.soundroo.com');
+  assert.equal(parseOrigin('https://soundroo.com'), parseOrigin('https://www.soundroo.com'));
+  assert.ok(sameOrigin('https://www.soundroo.com', 'https://soundroo.com/@amber/track'));
+  assert.ok(!sameOrigin('https://www.soundroo.com', 'https://staging.soundroo.com/@amber/track'));
   assert.equal(parseOrigin('http://127.0.0.1:8350'), 'http://127.0.0.1:8350');
   assert.equal(parseOrigin('http://[::1]:8350/'), 'http://[::1]:8350');
-  for (const bad of ['http://soundroo.com', 'https://soundroo.com/api', 'https://a:b@soundroo.com', 'https://soundroo.com?x', 'ftp://soundroo.com', 'soundroo.com']) assert.throws(() => parseOrigin(bad), TypeError, bad);
-  assert.equal(resolveService(undefined, {}), 'https://soundroo.com');
+  for (const bad of ['http://soundroo.com', 'https://www.soundroo.com/api', 'https://a:b@soundroo.com', 'https://www.soundroo.com?x', 'ftp://soundroo.com', 'soundroo.com']) assert.throws(() => parseOrigin(bad), TypeError, bad);
+  assert.equal(resolveService(undefined, {}), 'https://www.soundroo.com');
   assert.equal(resolveService(undefined, { SOUNDROO_URL: 'http://localhost:8350' }), 'http://localhost:8350');
   assert.equal(resolveService('https://staging.example', { SOUNDROO_URL: 'http://localhost:8350' }), 'https://staging.example');
 });

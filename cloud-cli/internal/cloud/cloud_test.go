@@ -13,9 +13,9 @@ import (
 
 func TestParseOriginCanonicalizesAndRefusesUnsafeURLs(t *testing.T) {
 	good := map[string]string{
-		"https://soundroo.com":         "https://soundroo.com",
-		"HTTPS://SoundRoo.COM:443/":    "https://soundroo.com",
-		" https://soundroo.com/ ":      "https://soundroo.com",
+		"https://soundroo.com":         "https://www.soundroo.com",
+		"HTTPS://SoundRoo.COM:443/":    "https://www.soundroo.com",
+		" https://www.soundroo.com/ ":  "https://www.soundroo.com",
 		"https://www.soundroo.com":     "https://www.soundroo.com",
 		"https://staging.example:8443": "https://staging.example:8443",
 		"http://127.0.0.1:8350":        "http://127.0.0.1:8350",
@@ -29,12 +29,12 @@ func TestParseOriginCanonicalizesAndRefusesUnsafeURLs(t *testing.T) {
 			t.Errorf("ParseOrigin(%q) = %q, %v; want %q", in, got, err, want)
 		}
 	}
-	for _, bad := range []string{"", "soundroo.com", "http://soundroo.com", "http://192.168.1.5:8350", "ftp://soundroo.com", "https://user:pass@soundroo.com", "https://soundroo.com/api/v1", "https://soundroo.com/?x=1", "https://soundroo.com/#top", "javascript:alert(1)", "https://"} {
+	for _, bad := range []string{"", "soundroo.com", "http://soundroo.com", "http://192.168.1.5:8350", "ftp://soundroo.com", "https://user:pass@soundroo.com", "https://www.soundroo.com/api/v1", "https://www.soundroo.com/?x=1", "https://www.soundroo.com/#top", "javascript:alert(1)", "https://"} {
 		if got, err := ParseOrigin(bad); err == nil {
 			t.Errorf("ParseOrigin(%q) accepted as %q", bad, got)
 		}
 	}
-	if !SameOrigin("https://soundroo.com", "https://soundroo.com:443/link?code=1") || SameOrigin("https://soundroo.com", "https://www.soundroo.com/link") || SameOrigin("https://soundroo.com", "/link") {
+	if !SameOrigin("https://www.soundroo.com", "https://www.soundroo.com:443/link?code=1") || !SameOrigin("https://www.soundroo.com", "https://soundroo.com/link") || SameOrigin("https://www.soundroo.com", "https://staging.soundroo.com/link") || SameOrigin("https://www.soundroo.com", "/link") {
 		t.Error("SameOrigin")
 	}
 }

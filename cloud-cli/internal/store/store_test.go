@@ -22,13 +22,13 @@ func newStore(t *testing.T, origin string, env map[string]string) Store {
 }
 
 func TestKeysArePerOriginAndOwnerOnly(t *testing.T) {
-	prod := newStore(t, "https://soundroo.com", nil)
+	prod := newStore(t, "https://www.soundroo.com", nil)
 	dev := prod
 	dev.Origin = "http://127.0.0.1:8350"
 	if _, _, err := prod.Key(); !errors.Is(err, ErrNoKey) {
 		t.Fatalf("empty store: %v", err)
 	}
-	if err := prod.Save("1|prodkey000000", Account{Kind: KindGuest, Artist: Artist{Handle: "amber"}, ClaimURL: "https://soundroo.com/claim/abc"}); err != nil {
+	if err := prod.Save("1|prodkey000000", Account{Kind: KindGuest, Artist: Artist{Handle: "amber"}, ClaimURL: "https://www.soundroo.com/claim/abc"}); err != nil {
 		t.Fatal(err)
 	}
 	if err := dev.Save("2|devkey0000000", Account{Kind: KindAccount, Artist: Artist{Handle: "mara"}}); err != nil {
@@ -41,7 +41,7 @@ func TestKeysArePerOriginAndOwnerOnly(t *testing.T) {
 		t.Fatalf("dev key: %q", token)
 	}
 	account, ok, err := prod.Account()
-	if err != nil || !ok || account.ClaimURL != "https://soundroo.com/claim/abc" || account.CreatedAt == "" {
+	if err != nil || !ok || account.ClaimURL != "https://www.soundroo.com/claim/abc" || account.CreatedAt == "" {
 		t.Fatalf("account: %+v %v", account, err)
 	}
 	if runtime.GOOS != "windows" {
@@ -67,8 +67,38 @@ func TestKeysArePerOriginAndOwnerOnly(t *testing.T) {
 	}
 }
 
+func TestKeysSavedForTheBareDomainMoveToWww(t *testing.T) {
+	bare := newStore(t, "https://soundroo.com", nil)
+	if err := bare.Save("1|barekey000000", Account{Kind: KindGuest, Artist: Artist{Handle: "amber"}, ClaimURL: "https://soundroo.com/claim/abc"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := bare.SavePendingLogin(PendingLogin{DeviceCode: "dc", UserCode: "ABCD-EFGH"}); err != nil {
+		t.Fatal(err)
+	}
+	www := bare
+	www.Origin = "https://www.soundroo.com"
+	if token, source, err := www.Key(); err != nil || token != "1|barekey000000" || source != SourceFile {
+		t.Fatalf("www key: %q %q %v", token, source, err)
+	}
+	if account, ok, err := www.Account(); err != nil || !ok || account.Artist.Handle != "amber" {
+		t.Fatalf("www account: %+v %v %v", account, ok, err)
+	}
+	if login, ok, err := www.PendingLogin(); err != nil || !ok || login.UserCode != "ABCD-EFGH" {
+		t.Fatalf("www login: %+v %v %v", login, ok, err)
+	}
+	if _, err := bare.StoredKey(); !errors.Is(err, ErrNoKey) {
+		t.Fatal("the bare-domain key was copied, not moved")
+	}
+	if err := bare.Save("2|newbarekey0000", Account{Kind: KindAccount}); err != nil {
+		t.Fatal(err)
+	}
+	if token, _, _ := www.Key(); token != "1|barekey000000" {
+		t.Fatal("a stored www key was replaced by a bare-domain key")
+	}
+}
+
 func TestEnvironmentKeyWinsAndIsNeverStored(t *testing.T) {
-	s := newStore(t, "https://soundroo.com", map[string]string{"SOUNDROO_TOKEN": "3|envkey0000000"})
+	s := newStore(t, "https://www.soundroo.com", map[string]string{"SOUNDROO_TOKEN": "3|envkey0000000"})
 	if token, source, err := s.Key(); err != nil || token != "3|envkey0000000" || source != SourceEnv {
 		t.Fatalf("env key: %q %q %v", token, source, err)
 	}
@@ -78,8 +108,8 @@ func TestEnvironmentKeyWinsAndIsNeverStored(t *testing.T) {
 }
 
 func TestPendingLoginsAndCorruptFiles(t *testing.T) {
-	s := newStore(t, "https://soundroo.com", nil)
-	if err := s.SavePendingLogin(PendingLogin{DeviceCode: "secret-device", UserCode: "ABCD-EFGH", VerificationURI: "https://soundroo.com/link", ExpiresAt: "2026-10-13T12:00:00Z", Interval: 5}); err != nil {
+	s := newStore(t, "https://www.soundroo.com", nil)
+	if err := s.SavePendingLogin(PendingLogin{DeviceCode: "secret-device", UserCode: "ABCD-EFGH", VerificationURI: "https://www.soundroo.com/link", ExpiresAt: "2026-10-13T12:00:00Z", Interval: 5}); err != nil {
 		t.Fatal(err)
 	}
 	p, ok, err := s.PendingLogin()

@@ -136,7 +136,7 @@ export async function runNetworkCommand(command, { positional = [], options = {}
       return result.status === 'failed' ? 2 : 0;
     }
     if (command === 'import') {
-      if (!positional[0]) throw new ShareError('Name the track to import: node bin/soundroo.js import https://soundroo.com/t/ID --library library/my-music', { code: 'usage' });
+      if (!positional[0]) throw new ShareError('Name the track to import: node bin/soundroo.js import https://www.soundroo.com/t/ID --library library/my-music', { code: 'usage' });
       const result = await importTrack(libraryPath(options.library), positional[0], { service: options.service, env, dryRun: options['dry-run'] === true, onProgress: json ? undefined : progressLogger(log) });
       if (json) print(result);
       else if (result.dryRun) {

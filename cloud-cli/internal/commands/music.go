@@ -33,7 +33,7 @@ var (
 		Path:        "track show",
 		Summary:     "Show a shared track",
 		OutputModes: []string{rungrad.OutputModeHuman, rungrad.OutputModeJSON},
-		Examples:    []string{"soundroo-cloud track show 01JABCDEFGHJKMNPQRSTVWXYZ0", "soundroo-cloud track show https://soundroo.com/t/01JABCDEFGHJKMNPQRSTVWXYZ0 --json"},
+		Examples:    []string{"soundroo-cloud track show 01JABCDEFGHJKMNPQRSTVWXYZ0", "soundroo-cloud track show https://www.soundroo.com/t/01JABCDEFGHJKMNPQRSTVWXYZ0 --json"},
 		Related:     []string{"soundroo-cloud score"},
 	}
 	trackUpdateSpec = rungrad.CommandSpec{
@@ -66,7 +66,7 @@ var (
 		Path:        "collection show",
 		Summary:     "Show a shared collection and its tracks",
 		OutputModes: []string{rungrad.OutputModeHuman, rungrad.OutputModeJSON},
-		Examples:    []string{"soundroo-cloud collection show 01JABCDEFGHJKMNPQRSTVWXYZ0", "soundroo-cloud collection show https://soundroo.com/c/01JABCDEFGHJKMNPQRSTVWXYZ0 --json"},
+		Examples:    []string{"soundroo-cloud collection show 01JABCDEFGHJKMNPQRSTVWXYZ0", "soundroo-cloud collection show https://www.soundroo.com/c/01JABCDEFGHJKMNPQRSTVWXYZ0 --json"},
 		Related:     []string{"soundroo-cloud track show"},
 	}
 	collectionUpdateSpec = rungrad.CommandSpec{
@@ -83,7 +83,7 @@ var (
 		Summary:     "Download an open track's score, mix and credit",
 		GroupID:     "music",
 		OutputModes: []string{rungrad.OutputModeHuman, rungrad.OutputModeJSON},
-		Examples:    []string{"soundroo-cloud score 01JABCDEFGHJKMNPQRSTVWXYZ0 --json", "soundroo-cloud score https://soundroo.com/t/01JABCDEFGHJKMNPQRSTVWXYZ0 --json", "soundroo-cloud score https://soundroo.com/@mara/night-train --json"},
+		Examples:    []string{"soundroo-cloud score 01JABCDEFGHJKMNPQRSTVWXYZ0 --json", "soundroo-cloud score https://www.soundroo.com/t/01JABCDEFGHJKMNPQRSTVWXYZ0 --json", "soundroo-cloud score https://www.soundroo.com/@mara/night-train --json"},
 		Related:     []string{"soundroo-cloud track show"},
 	}
 )

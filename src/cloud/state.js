@@ -24,8 +24,12 @@ export function readSharing(directory) {
 export const LIBRARY_UID = /^[a-zA-Z0-9._-]{1,100}$/;
 export const newLibraryUid = () => 'sr-' + crypto.randomBytes(16).toString('hex');
 
+// soundroo.com moved to www.soundroo.com; a library shared before keeps its
+// links and unfinished request under the old origin until the next share.
+const FORMER_ORIGINS = { 'https://www.soundroo.com': 'https://soundroo.com' };
+
 export function serviceState(state, origin) {
-  return state.services?.[origin] ?? {};
+  return state.services?.[origin] ?? state.services?.[FORMER_ORIGINS[origin]] ?? {};
 }
 
 function save(directory, state) {
@@ -45,6 +49,7 @@ export function ensureLibraryUid(directory) {
 export function updateService(directory, origin, change) {
   const state = readSharing(directory);
   state.services = { ...state.services, [origin]: change({ ...serviceState(state, origin) }) };
+  if (FORMER_ORIGINS[origin]) delete state.services[FORMER_ORIGINS[origin]];
   save(directory, state);
   return state.services[origin];
 }

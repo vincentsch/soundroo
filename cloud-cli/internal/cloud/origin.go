@@ -11,7 +11,11 @@ import (
 
 // DefaultService is the production origin. Test builds may replace it with
 // -ldflags "-X github.com/vincentsch/soundroo/cloud-cli/internal/cloud.DefaultService=...".
-var DefaultService = "https://soundroo.com"
+var DefaultService = "https://www.soundroo.com"
+
+// sameService maps origins that redirect to the production origin: older links
+// and settings name the bare domain soundroo.com.
+var sameService = map[string]string{"https://soundroo.com": "https://www.soundroo.com"}
 
 // ParseOrigin validates a service origin and returns its canonical form:
 // lowercase scheme and host, no default port, no path, query, fragment or user
@@ -23,7 +27,7 @@ func ParseOrigin(raw string) (string, error) {
 	}
 	u, err := url.Parse(value)
 	if err != nil || u.Scheme == "" || u.Host == "" {
-		return "", fmt.Errorf("%q is not a service URL such as https://soundroo.com", raw)
+		return "", fmt.Errorf("%q is not a service URL such as https://www.soundroo.com", raw)
 	}
 	scheme := strings.ToLower(u.Scheme)
 	if u.User != nil {
@@ -33,7 +37,7 @@ func ParseOrigin(raw string) (string, error) {
 		return "", fmt.Errorf("the service URL must not contain a query or fragment")
 	}
 	if u.Path != "" && u.Path != "/" {
-		return "", fmt.Errorf("use the service origin without a path, for example https://soundroo.com")
+		return "", fmt.Errorf("use the service origin without a path, for example https://www.soundroo.com")
 	}
 	host := strings.ToLower(u.Hostname())
 	port := u.Port()
@@ -60,6 +64,9 @@ func ParseOrigin(raw string) (string, error) {
 	}
 	if port != "" {
 		return scheme + "://" + host + ":" + port, nil
+	}
+	if canonical, ok := sameService[scheme+"://"+host]; ok {
+		return canonical, nil
 	}
 	return scheme + "://" + host, nil
 }

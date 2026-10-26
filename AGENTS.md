@@ -4,7 +4,7 @@ This file tells you, the AI agent, how to make music with Soundroo. The person g
 
 Soundroo needs Node.js 22 or newer and nothing else: no account, no API key, no music software, no model download. Speech is optional.
 
-The documentation for people is at https://soundroo.com/docs.
+The documentation for people is at https://www.soundroo.com/docs.
 
 ## Before you start
 
@@ -18,7 +18,7 @@ node bin/soundroo.js doctor
 
 `doctor` checks Node. If Node is missing or older than 22, tell the person and help them install Node 22 (for example from https://nodejs.org or with nvm). Nothing else needs installing.
 
-If you can't run commands on a real computer at all (for example in a chat app), stop and send the person to https://soundroo.com/connect. That page explains the Soundroo connector for ChatGPT and Claude.
+If you can't run commands on a real computer at all (for example in a chat app), stop and send the person to https://www.soundroo.com/connect. That page explains the Soundroo connector for ChatGPT and Claude.
 
 ## What to make
 

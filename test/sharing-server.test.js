@@ -11,7 +11,7 @@ const skip = !posix && 'the soundroo-cloud stand-in needs a POSIX shebang';
 test('the studio shares only on an explicit, same-page request and never exposes keys', { skip }, async () => {
   const directory = await makeLibrary();
   const stub = installStub({
-    'auth status': { service: 'https://soundroo.com', key: { present: true, source: 'file', masked: '****wxyz', kind: 'guest', artist: { handle: 'amber-orchard' }, claimUrl: 'https://soundroo.com/claim/secretclaimtoken' } },
+    'auth status': { service: 'https://www.soundroo.com', key: { present: true, source: 'file', masked: '****wxyz', kind: 'guest', artist: { handle: 'amber-orchard' }, claimUrl: 'https://www.soundroo.com/claim/secretclaimtoken' } },
     publish: releaseAnswer({ status: 'queued' }),
     'release show': releaseAnswer({ status: 'ready', claimUrl: null }),
   });
@@ -27,7 +27,7 @@ test('the studio shares only on an explicit, same-page request and never exposes
     // without checking each track.
     const status = await (await call('/api/share')).json();
     assert.equal(status.available, true);
-    assert.equal(status.service, 'https://soundroo.com');
+    assert.equal(status.service, 'https://www.soundroo.com');
     assert.match(status.token, /^[A-Za-z0-9_-]{32}$/);
     assert.equal(status.collection.title, 'Night Trains');
     assert.equal(status.tracks, undefined, 'the page-load check surveyed the tracks');
@@ -43,7 +43,7 @@ test('the studio shares only on an explicit, same-page request and never exposes
     // Opening the dialog reads the library and the stored key, locally.
     const account = await (await call('/api/share/account', { headers: token })).json();
     assert.deepEqual(account.tracks.map(t => [t.localId, t.status]), [['night-train', 'ready'], ['city-lights', 'ready']]);
-    assert.equal(account.key.claimUrl, 'https://soundroo.com/claim/secretclaimtoken');
+    assert.equal(account.key.claimUrl, 'https://www.soundroo.com/claim/secretclaimtoken');
     assert.equal(account.key.kind, 'guest');
     assert.ok(!JSON.stringify(account).includes('wxyz'), 'the masked key is not needed by the page');
     assert.deepEqual(stub.calls().map(c => c.command), ['version', 'auth status'], 'opening the dialog contacted the service');
@@ -76,7 +76,7 @@ test('the studio shares only on an explicit, same-page request and never exposes
       ({ job } = await (await call(`/api/share/jobs/${job.id}`, { headers: token })).json());
     }
     assert.equal(job.status, 'done', JSON.stringify(job.error));
-    assert.equal(job.result.claimUrl, 'https://soundroo.com/claim/secretclaimtoken');
+    assert.equal(job.result.claimUrl, 'https://www.soundroo.com/claim/secretclaimtoken');
     assert.equal((await call(`/api/share/jobs/${job.id}`)).status, 403, 'job results need the token');
     const sent = JSON.parse(stub.calls().find(c => c.command === 'publish').input);
     assert.equal(sent.rightsAccepted, true);
@@ -92,13 +92,13 @@ test('the studio shares only on an explicit, same-page request and never exposes
 
 test('a studio update keeps choices made on the service and shows the way back to an earlier guest page', { skip }, async () => {
   const directory = await makeLibrary();
-  const origin = 'https://soundroo.com';
+  const origin = 'https://www.soundroo.com';
   // Shared before as a guest page; since then made public, with one private,
   // listen-only track, on the website.
   updateService(directory, origin, s => ({ ...s, artist: { handle: 'amber-orchard' }, collection: { id: '01JCOLLECTION0000000000001', title: 'Night Trains', visibility: 'unlisted' }, tracks: { 'night-train': { access: 'open' }, 'city-lights': { access: 'open' } }, lastRelease: { id: '01JRELEASE0000000000000001', status: 'ready', payloadSha256: 'f'.repeat(64) } }));
   const onService = canEdit => ({ id: '01JCOLLECTION0000000000001', visibility: 'public', artist: '@amber-orchard', canEdit, tracks: [{ localId: 'night-train', visibility: 'private', access: 'listen-only' }, { localId: 'city-lights', visibility: 'unlisted', access: 'open' }] });
   // An account connected before the guest page was claimed.
-  const formerGuest = { artist: { handle: 'amber-orchard', name: 'Amber Orchard' }, claimUrl: 'https://soundroo.com/claim/formerguest' };
+  const formerGuest = { artist: { handle: 'amber-orchard', name: 'Amber Orchard' }, claimUrl: 'https://www.soundroo.com/claim/formerguest' };
   const accountKey = extra => ({ service: origin, key: { present: true, source: 'file', kind: 'account', artist: { handle: 'mara' }, ...extra } });
   const stub = installStub({ 'auth status': accountKey({ formerGuest }), 'collection show': onService(false), publish: releaseAnswer({ status: 'ready' }) });
   const saved = { ...process.env };
@@ -123,7 +123,7 @@ test('a studio update keeps choices made on the service and shows the way back t
     let job = await share({ rightsAccepted: true, tracks: ['night-train', 'city-lights'] });
     assert.equal(job.status, 'error');
     assert.equal(job.error.code, 'artist_mismatch');
-    assert.equal(job.error.claimUrl, 'https://soundroo.com/claim/formerguest');
+    assert.equal(job.error.claimUrl, 'https://www.soundroo.com/claim/formerguest');
     assert.ok(!stub.calls().some(c => c.command === 'publish'));
     // Claimed: an untouched update sends no choices, so the service's stay.
     stub.set({ 'auth status': accountKey(), 'collection show': onService(true), publish: releaseAnswer({ status: 'ready' }) });

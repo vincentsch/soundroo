@@ -73,13 +73,13 @@ export function installStub(behavior) {
 }
 
 // The JSON soundroo-cloud prints for a publish or release show.
-export function releaseAnswer({ id = '01JRELEASE0000000000000001', status = 'queued', tracks = ['night-train', 'city-lights'], claimUrl = 'https://soundroo.com/claim/secretclaimtoken', replayed = false, visibility = 'unlisted', access = 'open' } = {}) {
+export function releaseAnswer({ id = '01JRELEASE0000000000000001', status = 'queued', tracks = ['night-train', 'city-lights'], claimUrl = 'https://www.soundroo.com/claim/secretclaimtoken', replayed = false, visibility = 'unlisted', access = 'open' } = {}) {
   return {
-    service: 'https://soundroo.com',
-    release: { id, status, replayed, statusUrl: `https://soundroo.com/api/v1/releases/${id}` },
-    collection: { id: '01JCOLLECTION0000000000001', title: 'Night Trains', url: 'https://soundroo.com/@amber-orchard/collections/night-trains', shortUrl: 'https://soundroo.com/c/01JCOLLECTION0000000000001', visibility },
-    artist: { id: '01JARTIST00000000000000001', handle: 'amber-orchard', name: 'Amber Orchard', url: 'https://soundroo.com/@amber-orchard' },
-    tracks: tracks.map((localId, i) => ({ localId, id: `01JTRACK${String(i).padStart(18, '0')}`, title: localId, status: status === 'queued' ? 'queued' : status, url: `https://soundroo.com/@amber-orchard/${localId}`, shortUrl: `https://soundroo.com/t/01JTRACK${String(i).padStart(18, '0')}`, visibility, access })),
+    service: 'https://www.soundroo.com',
+    release: { id, status, replayed, statusUrl: `https://www.soundroo.com/api/v1/releases/${id}` },
+    collection: { id: '01JCOLLECTION0000000000001', title: 'Night Trains', url: 'https://www.soundroo.com/@amber-orchard/collections/night-trains', shortUrl: 'https://www.soundroo.com/c/01JCOLLECTION0000000000001', visibility },
+    artist: { id: '01JARTIST00000000000000001', handle: 'amber-orchard', name: 'Amber Orchard', url: 'https://www.soundroo.com/@amber-orchard' },
+    tracks: tracks.map((localId, i) => ({ localId, id: `01JTRACK${String(i).padStart(18, '0')}`, title: localId, status: status === 'queued' ? 'queued' : status, url: `https://www.soundroo.com/@amber-orchard/${localId}`, shortUrl: `https://www.soundroo.com/t/01JTRACK${String(i).padStart(18, '0')}`, visibility, access })),
     ...(claimUrl ? { claimUrl } : {}),
     credential: { source: 'file', created: true, kind: 'guest' },
     idempotencyKey: 'from-stub',

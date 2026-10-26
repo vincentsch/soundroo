@@ -18,7 +18,7 @@ import (
 
 // Version is the soundroo-cloud release. Protocol is the JSON contract the
 // Soundroo toolkit relies on; it changes only for incompatible output changes.
-var Version = "0.2.1"
+var Version = "0.2.2"
 
 const Protocol = 1
 
@@ -59,7 +59,7 @@ func NewApp(opts Options) *rungrad.App {
 				EnvVar:    ServiceEnv,
 				ConfigKey: "url",
 				Default:   cloud.DefaultService,
-				Usage:     "Soundroo service origin, such as https://soundroo.com",
+				Usage:     "Soundroo service origin, such as https://www.soundroo.com",
 				Validate:  cloud.ValidateServiceValue,
 			}},
 		},

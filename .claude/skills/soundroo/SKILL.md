@@ -66,6 +66,6 @@ Rules:
 
 ## Remix an open track
 
-`node bin/soundroo.js import https://soundroo.com/t/ID --library library/NAME --json`
+`node bin/soundroo.js import https://www.soundroo.com/t/ID --library library/NAME --json`
 adds the shared score with its credit in `tracks/<id>/source.json`. Change the
 music before sharing the remix.

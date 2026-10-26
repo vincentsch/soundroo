@@ -12,10 +12,10 @@ const skip = !posix && 'the soundroo-cloud stand-in needs a POSIX shebang';
 
 function shared(original, mix = { parts: { bass: { volume: 0.7 } }, master: {} }) {
   return {
-    service: 'https://soundroo.com', trackId: '01JORIGINAL000000000000001',
+    service: 'https://www.soundroo.com', trackId: '01JORIGINAL000000000000001',
     score: original, mix, engine: { version: engine.engineInfo().version, hash: engine.engineHash() },
     revision: engine.revision(original, { mix }), remixOf: '01JORIGINAL000000000000001',
-    artist: { handle: 'mara', name: 'Mara', url: 'https://soundroo.com/@mara' }, license: 'CC-BY-4.0',
+    artist: { handle: 'mara', name: 'Mara', url: 'https://www.soundroo.com/@mara' }, license: 'CC-BY-4.0',
   };
 }
 
@@ -27,22 +27,22 @@ test('lists made from JSON objects are turned back into objects', () => {
   assert.deepEqual(s.parts[0].sample.pattern, [0, 1], 'chop steps are a real list');
   assert.deepEqual(mix, {});
   assert.deepEqual(normalizeImported({ parts: [] }, { parts: [{ volume: 1 }], master: [] }).mix, { parts: { '0': { volume: 1 } }, master: {} });
-  assert.equal(trackReference('01JORIGINAL000000000000001', 'https://soundroo.com'), '01JORIGINAL000000000000001');
-  assert.equal(trackReference('https://soundroo.com/t/01JORIGINAL000000000000001', 'https://soundroo.com'), '01JORIGINAL000000000000001');
-  assert.throws(() => trackReference('https://other.example/t/01JORIGINAL000000000000001', 'https://soundroo.com'), error => error.code === 'other_service');
-  assert.equal(trackReference('https://soundroo.com/@mara/night-train?ref=x', 'https://soundroo.com'), 'https://soundroo.com/@mara/night-train');
-  assert.throws(() => trackReference('https://soundroo.com/@mara', 'https://soundroo.com'), error => error.code === 'invalid_reference');
+  assert.equal(trackReference('01JORIGINAL000000000000001', 'https://www.soundroo.com'), '01JORIGINAL000000000000001');
+  assert.equal(trackReference('https://www.soundroo.com/t/01JORIGINAL000000000000001', 'https://www.soundroo.com'), '01JORIGINAL000000000000001');
+  assert.throws(() => trackReference('https://other.example/t/01JORIGINAL000000000000001', 'https://www.soundroo.com'), error => error.code === 'other_service');
+  assert.equal(trackReference('https://www.soundroo.com/@mara/night-train?ref=x', 'https://www.soundroo.com'), 'https://www.soundroo.com/@mara/night-train');
+  assert.throws(() => trackReference('https://www.soundroo.com/@mara', 'https://www.soundroo.com'), error => error.code === 'invalid_reference');
 });
 
 test('an open track arrives exactly, credited, with a safe id and remix lineage', { skip }, async () => {
   const directory = await makeLibrary({ tracks: ['night-train'] });
   const original = score('night-train', { title: 'Night Train' });
   const stub = installStub({ score: shared(original) });
-  const result = await importTrack(directory, 'https://soundroo.com/t/01JORIGINAL000000000000001', { env: stub.env });
+  const result = await importTrack(directory, 'https://www.soundroo.com/t/01JORIGINAL000000000000001', { env: stub.env });
   assert.equal(result.verified, true);
   assert.equal(result.track.id, 'night-train-remix', 'an existing track keeps its id');
   assert.equal(result.remixOf, '01JORIGINAL000000000000001');
-  assert.match(result.credit, /“Night Train” by Mara \(https:\/\/soundroo\.com\/@mara\), https:\/\/soundroo\.com\/t\/01JORIGINAL000000000000001, licensed CC-BY-4.0/);
+  assert.match(result.credit, /“Night Train” by Mara \(https:\/\/www\.soundroo\.com\/@mara\), https:\/\/www\.soundroo\.com\/t\/01JORIGINAL000000000000001, licensed CC-BY-4.0/);
   assert.deepEqual(stub.calls().find(c => c.command === 'score').argv.slice(-2), ['score', '01JORIGINAL000000000000001']);
   const imported = readScore(directory, 'night-train-remix');
   assert.equal(imported.id, 'night-train-remix');
@@ -55,10 +55,10 @@ test('an open track arrives exactly, credited, with a safe id and remix lineage'
   assert.ok(getLibrary(directory).collection.tracks.includes('night-train-remix'));
   // An unchanged copy is not shared as a remix; a changed one carries its lineage.
   markRendered(directory, 'night-train-remix');
-  assert.throws(() => prepareRelease(directory, { origin: 'https://soundroo.com', tracks: ['night-train-remix'] }), error => error.issues[0].code === 'unchanged_remix');
+  assert.throws(() => prepareRelease(directory, { origin: 'https://www.soundroo.com', tracks: ['night-train-remix'] }), error => error.issues[0].code === 'unchanged_remix');
   await addTrack(directory, { ...imported, bpm: 132 }, { replace: true });
   markRendered(directory, 'night-train-remix');
-  const release = prepareRelease(directory, { origin: 'https://soundroo.com', tracks: ['night-train-remix'] });
+  const release = prepareRelease(directory, { origin: 'https://www.soundroo.com', tracks: ['night-train-remix'] });
   assert.equal(release.payload.tracks[0].remixOf, '01JORIGINAL000000000000001');
 });
 
