@@ -115,27 +115,41 @@ export class Env {
 
 // --- oscillator helpers -----------------------------------------------------------
 
-// Recordings are pitched with 16-point Kaiser-windowed sinc interpolation:
-// flat to 16 kHz and free of the treble loss and aliasing a short polynomial
-// adds. SINC holds the 16 weights for each of 2048 fractional positions.
+// Recordings are pitched with Kaiser-windowed sinc interpolation: flat to
+// 16 kHz and free of the treble loss and aliasing a short polynomial adds.
+// A kernel holds `taps` weights for each of `phases` fractional positions.
+// Played at its own speed or slower, a recording uses 16 taps; played faster
+// (higher notes, or a lower output rate), the kernel's cutoff falls with the
+// speed and it grows longer, so nothing above the output's Nyquist folds back.
 export const SINC_TAPS = 16;
 const SINC_PHASES = 2048;
-const SINC = (() => {
-  const half = SINC_TAPS / 2, cutoff = 0.46, beta = 8;
+const MAX_TAPS = 128;
+function makeKernel(taps, phases, cutoff, beta = 8) {
+  const half = taps / 2;
   const bessel = x => { let sum = 1, term = 1; for (let k = 1; k < 32; k++) { term *= (x / (2 * k)) ** 2; sum += term; } return sum; };
-  const table = new Float32Array((SINC_PHASES + 1) * SINC_TAPS);
-  for (let p = 0; p <= SINC_PHASES; p++) {
-    const f = p / SINC_PHASES, weights = [];
-    for (let j = 0; j < SINC_TAPS; j++) {
+  const table = new Float32Array((phases + 1) * taps);
+  for (let p = 0; p <= phases; p++) {
+    const f = p / phases, weights = [];
+    for (let j = 0; j < taps; j++) {
       const x = j - half + 1 - f;
       const sinc = x === 0 ? 2 * cutoff : Math.sin(2 * Math.PI * cutoff * x) / (Math.PI * x);
       weights.push(Math.abs(x) >= half ? 0 : sinc * bessel(beta * Math.sqrt(1 - (x / half) ** 2)) / bessel(beta));
     }
     const sum = weights.reduce((a, b) => a + b, 0);
-    weights.forEach((w, j) => { table[p * SINC_TAPS + j] = w / sum; });
+    weights.forEach((w, j) => { table[p * taps + j] = w / sum; });
   }
-  return table;
-})();
+  return { table, taps, phases };
+}
+const SINC_KERNEL = makeKernel(SINC_TAPS, SINC_PHASES, 0.46);
+const SINC = SINC_KERNEL.table;
+const kernels = new Map();
+/** The interpolation kernel for reading a recording `step` source frames per output frame. */
+export function kernelFor(step) {
+  if (!(step > 1 + 1e-9)) return SINC_KERNEL;
+  const speed = Math.ceil(step * 32) / 32;
+  if (!kernels.has(speed)) kernels.set(speed, makeKernel(Math.min(MAX_TAPS, 2 * Math.ceil(8 * speed)), 1024, 0.46 / speed));
+  return kernels.get(speed);
+}
 
 // 4-point, 3rd-order Hermite interpolation between d[j] and d[j + 1].
 function hermite(d, jm, j, f) {
@@ -735,25 +749,42 @@ export class Synth {
         }
         case 8: { // recording read from its pack while it plays, windowed-sinc pitching, optional loop, mono or stereo
           const source = L.source, step = L.step * mul, loop = L.loop, last = source.frames;
+          const kernel = L.kernel ??= kernelFor(step), taps = kernel.taps, half = taps / 2;
           let pos = L.pos;
-          if (!loop) source.ensure(Math.floor(pos) - SINC_TAPS / 2, Math.ceil(pos + step * cnt) + SINC_TAPS / 2 + 1);
-          const base = source.base, left = source.data[0], right = source.data[1] ?? left, S = SINC;
+          source.ensure(Math.floor(pos) - half, Math.ceil(pos + step * cnt) + half + 1);
+          const base = source.base, left = source.data[0], right = source.data[1] ?? left;
           // Stereo voices fill both accumulators; a mono lane takes the average of the channels.
           const both = v.stereo, two = right !== left, exact = step === 1 && pos === Math.floor(pos);
-          const offset = 1 - SINC_TAPS / 2 - base;
-          for (let k = 0; k < cnt; k++) {
-            if (loop !== null && loop !== undefined && pos >= loop[1]) pos -= loop[1] - loop[0];
-            const i = pos | 0;
-            if (i >= last) break;
-            const a = amp[k];
-            let l, r;
-            if (exact) { l = left[i - base]; r = right[i - base]; } else {
-              const w = ((pos - i) * SINC_PHASES + 0.5 | 0) * SINC_TAPS, f = i + offset;
-              l = S[w + 0] * left[f + 0] + S[w + 1] * left[f + 1] + S[w + 2] * left[f + 2] + S[w + 3] * left[f + 3] + S[w + 4] * left[f + 4] + S[w + 5] * left[f + 5] + S[w + 6] * left[f + 6] + S[w + 7] * left[f + 7] + S[w + 8] * left[f + 8] + S[w + 9] * left[f + 9] + S[w + 10] * left[f + 10] + S[w + 11] * left[f + 11] + S[w + 12] * left[f + 12] + S[w + 13] * left[f + 13] + S[w + 14] * left[f + 14] + S[w + 15] * left[f + 15];
-              r = two ? S[w + 0] * right[f + 0] + S[w + 1] * right[f + 1] + S[w + 2] * right[f + 2] + S[w + 3] * right[f + 3] + S[w + 4] * right[f + 4] + S[w + 5] * right[f + 5] + S[w + 6] * right[f + 6] + S[w + 7] * right[f + 7] + S[w + 8] * right[f + 8] + S[w + 9] * right[f + 9] + S[w + 10] * right[f + 10] + S[w + 11] * right[f + 11] + S[w + 12] * right[f + 12] + S[w + 13] * right[f + 13] + S[w + 14] * right[f + 14] + S[w + 15] * right[f + 15] : l;
+          const offset = 1 - half - base;
+          if (kernel === SINC_KERNEL) {
+            const S = SINC;
+            for (let k = 0; k < cnt; k++) {
+              if (loop !== null && loop !== undefined && pos >= loop[1]) pos -= loop[1] - loop[0];
+              const i = pos | 0;
+              if (i >= last) break;
+              const a = amp[k];
+              let l, r;
+              if (exact) { l = left[i - base]; r = right[i - base]; } else {
+                const w = ((pos - i) * SINC_PHASES + 0.5 | 0) * SINC_TAPS, f = i + offset;
+                l = S[w + 0] * left[f + 0] + S[w + 1] * left[f + 1] + S[w + 2] * left[f + 2] + S[w + 3] * left[f + 3] + S[w + 4] * left[f + 4] + S[w + 5] * left[f + 5] + S[w + 6] * left[f + 6] + S[w + 7] * left[f + 7] + S[w + 8] * left[f + 8] + S[w + 9] * left[f + 9] + S[w + 10] * left[f + 10] + S[w + 11] * left[f + 11] + S[w + 12] * left[f + 12] + S[w + 13] * left[f + 13] + S[w + 14] * left[f + 14] + S[w + 15] * left[f + 15];
+                r = two ? S[w + 0] * right[f + 0] + S[w + 1] * right[f + 1] + S[w + 2] * right[f + 2] + S[w + 3] * right[f + 3] + S[w + 4] * right[f + 4] + S[w + 5] * right[f + 5] + S[w + 6] * right[f + 6] + S[w + 7] * right[f + 7] + S[w + 8] * right[f + 8] + S[w + 9] * right[f + 9] + S[w + 10] * right[f + 10] + S[w + 11] * right[f + 11] + S[w + 12] * right[f + 12] + S[w + 13] * right[f + 13] + S[w + 14] * right[f + 14] + S[w + 15] * right[f + 15] : l;
+              }
+              if (both) { acc[k] += l * a; accR[k] += r * a; } else acc[k] += 0.5 * (l + r) * a;
+              pos += step;
             }
-            if (both) { acc[k] += l * a; accR[k] += r * a; } else acc[k] += 0.5 * (l + r) * a;
-            pos += step;
+          } else {
+            const S = kernel.table, phases = kernel.phases;
+            for (let k = 0; k < cnt; k++) {
+              if (loop !== null && loop !== undefined && pos >= loop[1]) pos -= loop[1] - loop[0];
+              const i = pos | 0;
+              if (i >= last) break;
+              const a = amp[k], w = ((pos - i) * phases + 0.5 | 0) * taps, f = i + offset;
+              let l = 0, r = 0;
+              if (two) for (let t = 0; t < taps; t++) { const c = S[w + t]; l += c * left[f + t]; r += c * right[f + t]; }
+              else { for (let t = 0; t < taps; t++) l += S[w + t] * left[f + t]; r = l; }
+              if (both) { acc[k] += l * a; accR[k] += r * a; } else acc[k] += 0.5 * (l + r) * a;
+              pos += step;
+            }
           }
           L.pos = pos;
           break;
@@ -853,7 +884,7 @@ export class Synth {
     for (const v of this.active) this._renderVoice(v, i0, n);
     if (this.active.length) {
       // A finished voice lets go of the recording window it was reading.
-      for (const v of this.active) if (v.end <= end) for (const layer of v.layers) if (layer.source && !layer.source.whole) layer.source.data = null;
+      for (const v of this.active) if (v.end <= end) for (const layer of v.layers) layer.source?.release();
       this.active = this.active.filter((v) => v.end > end);
     }
 

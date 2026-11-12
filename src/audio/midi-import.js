@@ -113,7 +113,8 @@ export function midiToScore(buffer, { id, title } = {}) {
   const beat = tick => round(tick / division);
   const all = tracks.flatMap((events, track) => events.map(event => ({ ...event, track })));
   const tempos = all.filter(e => e.type === 'tempo').sort((a, b) => a.tick - b.tick);
-  const bpm = round(Math.min(400, Math.max(20, tempos.find(e => e.tick === 0)?.bpm ?? tempos[0]?.bpm ?? 120)), 3);
+  // MIDI plays at 120 BPM until a tempo event says otherwise.
+  const bpm = round(Math.min(400, Math.max(20, tempos.find(e => e.tick === 0)?.bpm ?? 120)), 3);
   const tempo = [];
   for (const event of tempos) {
     const at = beat(event.tick), value = round(Math.min(400, Math.max(20, event.bpm)), 3);
@@ -131,8 +132,9 @@ export function midiToScore(buffer, { id, title } = {}) {
   const events = all.sort((a, b) => a.tick - b.tick || (a.type === 'off' ? -1 : 0) - (b.type === 'off' ? -1 : 0));
   for (const event of events) {
     if (event.type === 'program') programs.set(`${event.track}:${event.channel}`, event.program);
+    // The sustain pedal belongs to the channel: a piano's two staves often sit in separate tracks on one channel.
     if (event.type === 'control' && event.control === 64) {
-      const key = `${event.track}:${event.channel}`, list = pedals.get(key) ?? [];
+      const key = event.channel, list = pedals.get(key) ?? [];
       const down = event.value >= 64, last = list[list.length - 1];
       if (down && (!last || last.end !== undefined)) list.push({ start: event.tick });
       else if (!down && last && last.end === undefined) last.end = event.tick;
@@ -162,7 +164,7 @@ export function midiToScore(buffer, { id, title } = {}) {
     let partId = base, n = 2;
     while (used.has(partId)) partId = `${base}-${n++}`;
     used.add(partId);
-    const pedal = group.drum ? [] : (pedals.get(`${group.track}:${group.channel}`) ?? []).map(span => ({ beat: beat(span.start), beats: round(beat(span.end ?? lastTick) - beat(span.start)) })).filter(span => span.beats > 0);
+    const pedal = group.drum ? [] : (pedals.get(group.channel) ?? []).map(span => ({ beat: beat(span.start), beats: round(beat(span.end ?? lastTick) - beat(span.start)) })).filter(span => span.beats > 0);
     return { id: partId, name: group.drum ? group.instrument : names.get(group.track) || group.instrument, instrument: group.instrument, volume: group.drum ? 0.8 : 0.9, color: COLORS[index % COLORS.length], notes: group.notes.sort((a, b) => a.beat - b.beat || a.pitch - b.pitch), ...(pedal.length ? { pedal } : {}) };
   });
   const markers = all.filter(e => e.type === 'marker').sort((a, b) => a.tick - b.tick);

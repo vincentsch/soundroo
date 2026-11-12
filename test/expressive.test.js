@@ -150,3 +150,74 @@ test('MIDI drums split into the kit and General MIDI programs pick instruments',
   assert.equal(skipped, 1);
   assert.equal(validateScore(score).valid, true);
 });
+
+test('a recording played faster than the output rate is filtered, not folded back', async () => {
+  const { Synth, Voice, Env, WAVES } = await import('../src/audio/synth.js');
+  const { SampleStream } = await import('../src/audio/library.js');
+  const frames = 48000, tone = Float32Array.from({ length: frames }, (_, i) => Math.sin(2 * Math.PI * 6000 * i / 48000));
+  const recording = { frames, channels: 1, rate: 48000, key: 'test/tone', read: (start, count, out, at) => { out[0].set(tone.subarray(start, start + count), at); return out; } };
+  const output = (rate, wanted) => {
+    const synth = new Synth(rate, rate);
+    const lane = synth.lane({ stereo: true });
+    const voice = new Voice(0, 0.9);
+    voice.stereo = true;
+    voice.layer({ wave: WAVES.stream, source: new SampleStream(recording), step: 48000 / rate, start: 0, amp: new Env(0).set(1, 0) });
+    synth.add(lane, voice);
+    const left = new Float32Array(rate), right = new Float32Array(rate);
+    for (let i = 0; i < rate; i += 256) synth.renderBlock(i, Math.min(256, rate - i), left.subarray(i), right.subarray(i));
+    // Amplitude of `wanted` Hz between 0.1 and 0.8 s.
+    let re = 0, im = 0;
+    for (let i = Math.round(0.1 * rate); i < Math.round(0.8 * rate); i++) { re += left[i] * Math.cos(2 * Math.PI * wanted * i / rate); im += left[i] * Math.sin(2 * Math.PI * wanted * i / rate); }
+    return 2 * Math.hypot(re, im) / Math.round(0.7 * rate);
+  };
+  // At 8 kHz a 6 kHz tone is above Nyquist: it must vanish instead of returning at 2 kHz.
+  assert.ok(output(8000, 2000) < 0.01, 'no alias');
+  // At 44.1 kHz the same tone plays at full level.
+  assert.ok(output(44100, 6000) > 0.9, 'passes in band');
+});
+
+test('synthesized notes follow the sustain pedal too', async () => {
+  const notes = [{ pitch: 60, beat: 0, duration: 0.5, velocity: 0.7 }];
+  const window = [2 * 22050, 3 * 22050];
+  const dry = await renderScore(piano(notes), { sampleRate: 22050, sound: 'synthesized' });
+  const held = await renderScore(piano(notes, { pedal: [{ beat: 0, beats: 4 }] }), { sampleRate: 22050, sound: 'synthesized' });
+  assert.ok(energy(held.audio.getChannelData(0), ...window) > 1000 * energy(dry.audio.getChannelData(0), ...window));
+});
+
+test('fingerprints of unchanged scores stay the same across the 0.8.0 brightness defaults', () => {
+  // These fingerprints come from engine 0.7.0 for the same scores.
+  const line = instrument => ({ version: 2, id: 'x', title: 'X', bpm: 100, beats: 8, parts: [{ id: 'p', instrument, tone: {}, patterns: { a: { beats: 2, line: 'C4/1 E4/1' } }, clips: [{ pattern: 'a', beat: 0, repeat: 4 }] }] });
+  const explicit = instrument => { const s = line(instrument); s.parts[0].tone = { brightness: { piano: 12000, strings: 9000, brass: 9000, 'guitar-clean': 9000, 'electric-bass': 5000 }[instrument] }; return s; };
+  for (const instrument of ['piano', 'strings', 'brass', 'guitar-clean', 'electric-bass']) assert.equal(musicFingerprint(line(instrument)), musicFingerprint(explicit(instrument)), instrument);
+});
+
+test('MIDI import shares a channel\'s pedal between tracks and starts at 120 BPM', () => {
+  const vlq = n => { const b = [n & 127]; while ((n >>= 7)) b.unshift((n & 127) | 128); return b; };
+  const track = events => { const body = []; for (const [delta, bytes] of events) body.push(...vlq(delta), ...bytes); body.push(0, 0xff, 0x2f, 0); return [0x4d, 0x54, 0x72, 0x6b, 0, 0, (body.length >> 8) & 255, body.length & 255, ...body]; };
+  const t = 60000000 / 90;
+  const conductor = track([[1920, [0xff, 0x51, 3, (t >> 16) & 255, (t >> 8) & 255, t & 255]]]);
+  const right = track([[0, [0xb0, 64, 127]], [0, [0x90, 72, 90]], [480, [0x80, 72, 0]], [1440, [0xb0, 64, 0]]]);
+  const left = track([[0, [0x90, 48, 80]], [480, [0x80, 48, 0]]]);
+  const header = [0x4d, 0x54, 0x68, 0x64, 0, 0, 0, 6, 0, 1, 0, 3, 0x01, 0xe0];
+  const { score } = midiToScore(Uint8Array.from([...header, ...conductor, ...right, ...left]));
+  assert.equal(score.bpm, 120);
+  assert.deepEqual(score.tempo, [{ beat: 4, bpm: 90 }]);
+  assert.deepEqual(score.parts.map(p => p.pedal), [[{ beat: 0, beats: 4 }], [{ beat: 0, beats: 4 }]]);
+});
+
+test('recordings are read when their voice starts and let go when it ends', async () => {
+  const { SampleStream } = await import('../src/audio/library.js');
+  let reads = 0;
+  const recording = (frames, loop) => ({ frames, channels: 2, rate: 44100, key: `test/lazy-${frames}`, loop, read: (start, count, out) => { reads++; return out; } });
+  const looped = new SampleStream(recording(400000, [100000, 200000]));
+  const long = new SampleStream(recording(400000));
+  assert.equal(reads, 0, 'scheduling a note reads nothing');
+  looped.ensure(0, 256);
+  // A looped note never plays past its loop, so only that much is read.
+  assert.equal(looped.data[0].length, 200000 + 64 + 2 * 64);
+  long.ensure(0, 256);
+  assert.equal(reads, 2);
+  looped.release(); long.release();
+  assert.equal(looped.data, null);
+  assert.equal(long.data, null);
+});

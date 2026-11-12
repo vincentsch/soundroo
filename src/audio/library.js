@@ -59,7 +59,7 @@ const WHOLE_FRAMES = 96000;
 const WINDOW_FRAMES = 16384;
 const kept = new Map();
 let keptValues = 0;
-const KEPT_LIMIT = 48_000_000;
+const KEPT_LIMIT = 32_000_000;
 
 // PCM bytes into per-channel Float32Arrays, written at `at` in `out` (new arrays when out is omitted).
 function decode(buffer, frames, channels, bits, out = Array.from({ length: channels }, () => new Float32Array(frames)), at = 0) {
@@ -119,7 +119,8 @@ export class SampleLibrary {
       if (got !== buffer.length) throw new Error(`The ${packName} pack is shorter than expected; install it again.`);
       return decode(buffer, count, info.channels, info.bits, out, at);
     };
-    return { ...info, key: `${packName}/${name}`, read };
+    // Keyed by the pack's content, so recordings kept in memory always belong to this pack.
+    return { ...info, key: `${packFileName(packName)}/${name}`, read };
   }
 
   close() {
@@ -128,9 +129,9 @@ export class SampleLibrary {
   }
 }
 
-// Interpolation reads a few frames on either side of the playback position;
-// outside the recording they are silence.
-const PAD = 16;
+// Interpolation reads up to half its longest kernel (64 frames) on either side
+// of the playback position; outside the recording they are silence.
+const PAD = 64;
 
 // Frames [from, from + count) of a recording, silent outside it.
 function framesAround(recording, from, count) {
@@ -140,10 +141,12 @@ function framesAround(recording, from, count) {
   return out;
 }
 
-/** Frames of a recording as a voice plays it: short recordings whole, long
- * ones through a window that moves forward with the playback position.
- * data[channel][frame - base] holds the frames; reads may reach PAD frames
- * outside the recording. */
+/** Frames of a recording as a voice plays it. Nothing is read until the voice
+ * starts (ensure), and release() lets go of it when the voice ends. Short
+ * recordings and looped ones are read whole once (a looped note never plays
+ * past its loop, so only that far) and shared; long ones are read through a
+ * window that moves forward with the playback position. data[channel][frame -
+ * base] holds the frames; reads may reach PAD frames outside the recording. */
 export class SampleStream {
   constructor(recording) {
     this.recording = recording;
@@ -151,26 +154,41 @@ export class SampleStream {
     this.channels = recording.channels;
     this.base = 0;
     this.data = null;
-    if (recording.frames <= WHOLE_FRAMES || recording.loop) {
-      let whole = kept.get(recording.key);
-      if (!whole) {
-        whole = framesAround(recording, -PAD, recording.frames + 2 * PAD);
-        keptValues += recording.frames * recording.channels;
-        if (keptValues > KEPT_LIMIT) { kept.clear(); keptValues = recording.frames * recording.channels; }
-        kept.set(recording.key, whole);
-      }
-      this.data = whole;
-      this.base = -PAD;
-      this.whole = true;
-    }
+    this.whole = recording.frames <= WHOLE_FRAMES || !!recording.loop;
   }
 
   /** Makes frames [from, to) available in this.data (offset by this.base). */
   ensure(from, to) {
-    if (this.whole) return;
+    if (this.whole) {
+      if (!this.data) {
+        const length = this.recording.loop ? Math.min(this.frames, this.recording.loop[1] + PAD) : this.frames;
+        const key = `${this.recording.key}:${length}`;
+        let whole = kept.get(key);
+        if (whole) {
+          // Most recently used last, so the oldest goes first when the cache is full.
+          kept.delete(key);
+        } else {
+          whole = framesAround(this.recording, -PAD, length + 2 * PAD);
+          keptValues += length * this.channels;
+        }
+        kept.set(key, whole);
+        for (const [oldKey, oldData] of kept) {
+          if (keptValues <= KEPT_LIMIT || oldKey === key) break;
+          kept.delete(oldKey);
+          keptValues -= (oldData[0].length - 2 * PAD) * oldData.length;
+        }
+        this.data = whole;
+        this.base = -PAD;
+      }
+      return;
+    }
     if (this.data && from >= this.base && to <= this.base + this.data[0].length) return;
     const count = Math.max(WINDOW_FRAMES, to - from);
     this.base = from;
     this.data = framesAround(this.recording, from, count);
+  }
+
+  release() {
+    this.data = null;
   }
 }

@@ -146,7 +146,8 @@ function schedulePacked(synth, lane, part, timeline, rng, library, end, tone) {
 const toneOf = (part, sound) => Object.fromEntries(Object.keys(presets.get(part.instrument).controls).map(name => [name, part.tone[name] ?? toneDefault(part.instrument, name, sound)]));
 
 function schedule(synth, lane, note, part, timeline, rng, sound) {
-  const t = timeline.seconds(note.beat), duration = timeline.seconds(note.beat + note.duration) - t, velocity = note.velocity;
+  // The sustain pedal holds synthesized notes too, so both sounds of a track play the same articulation.
+  const t = timeline.seconds(note.beat), duration = timeline.seconds(damperBeat(part, note.beat + note.duration)) - t, velocity = note.velocity;
   const tone = toneOf(part, sound);
   const start = synth.pending.length;
   switch (part.instrument) {

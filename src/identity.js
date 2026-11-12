@@ -66,13 +66,18 @@ const byValues = (a, b) => {
   for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return a[i] === null ? -1 : b[i] === null ? 1 : a[i] - b[i];
   return 0;
 };
+// fp1 counts an unset tone control at its default. Engine 0.8.0 raised the brightness defaults of the
+// recorded instruments (they now play unfiltered); fingerprints keep the defaults fp1 was defined with, so
+// an unchanged score keeps its fingerprint across engines.
+const FINGERPRINT_DEFAULTS = { piano: { brightness: 12000 }, strings: { brightness: 9000 }, brass: { brightness: 9000 }, 'guitar-clean': { brightness: 9000 }, 'electric-bass': { brightness: 5000 } };
+
 export function musicFingerprint(score) {
   const expanded = compileScore(score);
   // Tempo changes and the sustain pedal (score version 3) are part of the music; scores without them keep
   // the fingerprint they had before version 3 existed.
   const parts = expanded.parts.filter(part => part.volume > 0 && part.notes.length).map(part => canonicalJson({
     instrument: part.instrument,
-    tone: round(Object.fromEntries(Object.entries(presets.get(part.instrument).controls).map(([name, spec]) => [name, part.tone[name] ?? spec.default]))),
+    tone: round(Object.fromEntries(Object.entries(presets.get(part.instrument).controls).map(([name, spec]) => [name, part.tone[name] ?? FINGERPRINT_DEFAULTS[part.instrument]?.[name] ?? spec.default]))),
     sample: part.sample ? round(audibleSample(part.sample)) : null,
     notes: part.notes.map(note => round(Object.values(audibleNote(part.instrument, note)))).sort(byValues),
     ...(part.pedal?.length ? { pedal: round(part.pedal.map(span => [span.beat, span.beats])) } : {}),
