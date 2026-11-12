@@ -8,6 +8,7 @@ import crypto from 'node:crypto';
 import { libraryPath, readJson, readScore, readMix, readCurrent, trackPath, sourceIdentity, VERSION } from '../project.js';
 import * as engine from '../headless.js';
 import { canonicalJson } from '../identity.js';
+import { makeTimeline } from '../timeline.js';
 import { readSharing, serviceState, LIBRARY_UID } from './state.js';
 import { ShareError } from './errors.js';
 
@@ -67,7 +68,7 @@ export function inspectTrack(directory, id) {
   const check = engine.validate(score);
   if (!check.valid) { problem('invalid_score', 'The score has problems. Fix them and render again.', { issues: check.issues.slice(0, 12) }); return out; }
   const compiled = engine.compile(score);
-  out.duration = compiled.beats * 60 / compiled.bpm;
+  out.duration = makeTimeline(compiled).duration;
   const local = (Array.isArray(score.parts) ? score.parts : []).filter(part => typeof part?.sample?.asset === 'string' && !part.sample.asset.startsWith('builtin:'));
   for (const part of local) {
     problem('local_audio', `Part “${part.name ?? part.id}” plays the local recording ${part.sample.asset}. The service renders only built-in voice phrases and spoken text recipes. Replace the asset with "speech": {"text": "…", "voice": "af_heart"} or remove the part, render again, then share.`, { part: part.id, asset: part.sample.asset });

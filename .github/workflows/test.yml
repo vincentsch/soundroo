@@ -15,5 +15,7 @@ jobs:
           cache: npm
       - run: npm ci --ignore-scripts
       - run: npm run check
+      # The recorded instruments (about 4 GB) come from the samples release; renders in the tests read them.
+      - run: node bin/soundroo.js samples --all
       - run: npm test
       - run: node bin/soundroo.js doctor

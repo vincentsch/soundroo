@@ -17,9 +17,11 @@ import { coverSvg, SLEEVE_STYLES } from './artwork.js';
 import { getCatalog, SCORE_LIMITS, SPEECH_VOICES } from './catalog.js';
 import { engineHash, engineManifest, sourceIdentity, musicFingerprint } from './identity.js';
 import { SPEECH_MODEL, speechRecipes as recipesOf, speechFile, synthesizeSpeech, defaultSpeechDir } from './speech.js';
+import { samplesStatus, scorePacks, installPacks, prepareSamples as prepareScoreSamples } from './samples-install.js';
+import { defaultSamplesDir, MissingSamplesError } from './audio/library.js';
 import { VERSION } from './version.js';
 
-export { engineHash, engineManifest };
+export { engineHash, engineManifest, defaultSamplesDir, MissingSamplesError };
 export const FINGERPRINT_VERSION = 'fp1';
 export const LIMITS = Object.freeze({ ...SCORE_LIMITS, ...RENDER_LIMITS });
 const programs = new Map(getCatalog().instruments.map(preset => [preset.id, preset.program]));
@@ -29,7 +31,7 @@ export function engineInfo() {
   return { version: VERSION, hash: engineHash(), scoreVersions: [...SCORE_VERSIONS], sounds: [...SOUNDS], fingerprint: FINGERPRINT_VERSION, limits: { ...LIMITS }, speech: { model: SPEECH_MODEL.id, dtype: SPEECH_MODEL.dtype, weights: SPEECH_MODEL.weights, sha256: SPEECH_MODEL.sha256, voices: [...SPEECH_VOICES] } };
 }
 
-/** {valid, issues: [{path, message}]} for score version 1 or 2. Never throws. */
+/** {valid, issues: [{path, message}]} for score version 1, 2 or 3. Never throws. */
 export function validate(score) {
   return validateScore(score);
 }
@@ -44,10 +46,13 @@ export function compile(score) {
 /** Render a score to 16-bit stereo WAV bytes, exactly as the CLI and studio do.
  * Options: mix, sampleRate (44100), from/to seconds, stems, projectDir for local
  * assets/ WAVs, speech {cacheDir, synthesize, modelDir, offline, log},
- * progress, signal. Returns {revision, duration, sampleRate, wav, report,
- * parts, stems?: {partId: wav}}. Invalid scores throw ScoreValidationError;
- * cancelled renders throw AbortError; audio failing signal checks throws an
- * error carrying .report. */
+ * samplesDir (where the recorded instruments' packs are installed; see
+ * prepareSamples), sound ('recorded' or 'synthesized'), progress, signal.
+ * Returns {revision, duration, sampleRate, wav, report, parts, stems?:
+ * {partId: wav}}. Invalid scores throw ScoreValidationError; cancelled renders
+ * throw AbortError; recorded instruments whose packs are not installed throw
+ * MissingSamplesError (code samples_missing); audio failing signal checks
+ * throws an error carrying .report. Renders never download. */
 export async function render(score, { mix = {}, sampleRate = 44100, projectDir, ...options } = {}) {
   const result = await renderScore(score, { ...options, mix, sampleRate, projectDir });
   const revision = sourceIdentity(score, { mix, sampleRate, projectDir });
@@ -78,11 +83,34 @@ const PERCUSSION = { kick: 36, snare: 38, clap: 39, 'hi-hat': 42, shaker: 70, 'r
 // GM toms occupy a sparse range; other pitches would select cymbals or effects.
 const tomPitch = pitch => [41, 43, 45, 47, 48, 50].reduce((a, b) => Math.abs(b - pitch) < Math.abs(a - pitch) ? b : a);
 /** Standard MIDI file bytes (format 1, 480 ticks per beat): a conductor track
- * with tempo and section markers, then one track per instrument with its GM
- * program; drums on channel 10. Sample and noise parts are left out. */
+ * with tempo (changes too; ramps in sixteenth-note steps) and section markers,
+ * then one track per instrument with its GM program and sustain pedal
+ * (controller 64); drums on channel 10. Sample and noise parts are left out. */
 export function midi(score) {
   const expanded = compileScore(score);
-  return encodeMidi({ title: expanded.title, bpm: expanded.bpm, sections: expanded.sections, tracks: expanded.parts.filter(p => !['sample', 'noise'].includes(p.instrument)).map(p => ({ name: p.name, program: programs.get(p.instrument), drums: p.instrument in PERCUSSION, notes: p.notes.map(n => ({ ...n, pitch: p.instrument === 'tom' ? tomPitch(n.pitch) : PERCUSSION[p.instrument] ?? n.pitch })) })) });
+  return encodeMidi({ title: expanded.title, bpm: expanded.bpm, tempo: expanded.tempo, sections: expanded.sections, tracks: expanded.parts.filter(p => !['sample', 'noise'].includes(p.instrument)).map(p => ({ name: p.name, program: programs.get(p.instrument), drums: p.instrument in PERCUSSION, pedal: p.pedal, notes: p.notes.map(n => ({ ...n, pitch: p.instrument === 'tom' ? tomPitch(n.pitch) : PERCUSSION[p.instrument] ?? n.pitch })) })) });
+}
+
+/** The sample packs of the recorded instruments: [{name, file, size,
+ * installed, instruments}]. Option: samplesDir. */
+export function samples(options) {
+  return samplesStatus(options);
+}
+
+/** The packs a score's recorded instruments play from, by name. */
+export function samplePacks(score) {
+  return scorePacks(score);
+}
+
+/** Downloads the packs a score needs that are not installed yet, and checks
+ * them (see samples-install.js). Options: samplesDir, log, signal. */
+export async function prepareSamples(score, options) {
+  return prepareScoreSamples(score, options);
+}
+
+/** Downloads the named packs (all packs when names is omitted). */
+export async function installSamples(names, options) {
+  return installPacks(names ?? samplesStatus(options).map(pack => pack.name), options);
 }
 
 /** The original 800×800 SVG sleeve the studio shows. Pass the track's position

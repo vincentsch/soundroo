@@ -2,16 +2,19 @@ import { readFile, realpath, stat } from 'node:fs/promises';
 import { resolve, relative, sep } from 'node:path';
 import { setImmediate as yieldTurn } from 'node:timers/promises';
 import { compileScore } from './score.js';
+import { makeTimeline } from './timeline.js';
 import { getCatalog } from './catalog.js';
-import { Synth, Voice, Env, WAVES, Reverb, Compressor, BLOCK } from './audio/synth.js';
+import { Synth, Voice, Env, WAVES, Compressor, BLOCK } from './audio/synth.js';
 import * as instruments from './audio/instruments.js';
-import { sampledNote } from './audio/sampler.js';
+import { PianoPlayer, RegionPlayer } from './audio/sampler.js';
+import { SampleLibrary, MissingSamplesError, instrumentPacks, defaultSamplesDir } from './audio/library.js';
 import { mtof } from './audio/dsp.js';
 import { makeRng, hashSeed } from './audio/rng.js';
 import { parseWav, toMono, resample } from './audio/pcm.js';
 import { tapePitch, granularVoice, vocodeVoice, chopVoice, CHOP_PATTERN } from './audio/voice-effects.js';
 import { analyzeAudio, technicalWarnings } from './audio/analysis.js';
 import { masterInPlace } from './audio/master.js';
+import { convolveHall } from './audio/convolution.js';
 import { arrangementSuggestions } from './arrangement.js';
 import { speechAudio } from './speech.js';
 
@@ -19,6 +22,8 @@ export const RENDER_LIMITS = Object.freeze({ minSampleRate: 8000, maxSampleRate:
 const presets = new Map(getCatalog().instruments.map(p => [p.id, p]));
 // Every render is matched to the same loudness; a master volume below the default turns it down from there.
 const DEFAULT_MASTER_VOLUME = 0.8;
+// The hall's level at master reverb 1, matched to the Freeverb of engines before 0.8.0.
+const HALL_LEVEL = 0.055;
 const audioBuffer = (channels, sampleRate) => ({ length: channels[0].length, sampleRate, numberOfChannels: channels.length, getChannelData(index) { if (!Number.isInteger(index) || !channels[index]) throw new RangeError('Invalid audio channel.'); return channels[index]; } });
 function bounded(value, min, max, label) {
   if (!Number.isFinite(value) || value < min || value > max) throw new TypeError(`${label} must be a finite number from ${min} to ${max}.`);
@@ -61,15 +66,6 @@ function sustained(synth, lane, t, pitch, velocity, duration, id, tone, rng) {
   synth.add(lane, v);
 }
 
-// Instruments played from recordings in assets/samples, with their level next
-// to the synthesized ones. Drums ring out; the others follow the note length.
-const RECORDED = {
-  piano: { level: 0.35 }, strings: { level: 0.12 }, brass: { level: 0.27 },
-  'electric-bass': { level: 0.76 }, 'guitar-clean': { level: 0.3 }, 'guitar-crunch': { level: 0.83 },
-  'rock-kick': { level: 1.23, drum: true }, 'rock-snare': { level: 0.7, drum: true }, 'closed-hat': { level: 0.084, drum: true }, 'open-hat': { level: 0.14, drum: true },
-  tom: { level: 0.57, drum: true }, crash: { level: 0.59, drum: true }, ride: { level: 0.42, drum: true },
-};
-
 // A score renders with recorded instruments, or with every instrument synthesized as engines before 0.6.0
 // made them. Synthesized parts keep the tone defaults those instruments had then.
 export const SOUNDS = ['recorded', 'synthesized'];
@@ -79,27 +75,79 @@ const SYNTHESIZED_DEFAULTS = {
 };
 const toneDefault = (instrument, name, sound) => (sound === 'synthesized' ? SYNTHESIZED_DEFAULTS[instrument]?.[name] : undefined) ?? presets.get(instrument).controls[name]?.default;
 
-function recordedNote(synth, lane, part, t, pitch, velocity, duration, tone, rng) {
-  const { level, drum } = RECORDED[part.instrument];
-  if (drum) return sampledNote(synth, lane, t, part.instrument, part.instrument === 'tom' ? pitch : null, velocity, duration, rng, { level, timed: false, maxShift: 3 });
-  // Palm muting shortens the note and darkens it, as a hand on the strings does.
+// Instruments that play from the full recordings in sample packs, with their
+// level next to the synthesized instruments.
+const PACKED = {
+  piano: { level: 0.3765 }, strings: { level: 0.1272 }, brass: { level: 0.3477 },
+  'electric-bass': { level: 0.7644 }, 'guitar-clean': { level: 0.5619 }, 'guitar-crunch': { level: 1.2169 },
+  'rock-kick': { level: 1.3529 }, 'rock-snare': { level: 0.7446 }, 'closed-hat': { level: 0.1489 }, 'open-hat': { level: 0.2317 },
+  tom: { level: 0.7757 }, crash: { level: 0.9958 }, ride: { level: 0.5635 },
+};
+
+// When a note's damper falls: when the note ends, or, if the sustain pedal is
+// down then, when the pedal comes up. Pedal spans that only touch are a pedal
+// change: the dampers fall between them.
+function damperBeat(part, end) {
+  for (const span of part.pedal ?? []) {
+    if (span.beat > end) break;
+    if (span.beat < end && end <= span.beat + span.beats) return span.beat + span.beats;
+  }
+  return end;
+}
+
+// The articulation a part's tone controls ask of a recorded note, as engines before 0.8.0 played it.
+function articulation(part, tone, pitch, start, off) {
   const mute = tone.palmMute ?? 0;
+  // Palm muting shortens the note and darkens it, as a hand on the strings does.
   const filter = mute > 0.05 ? { type: 'lowpass', freq: 700 + 9000 * (1 - mute) ** 2, q: 0.707 } : null;
   if (part.instrument === 'guitar-crunch') {
     // Overdrive keeps a fading string loud, so a distorted note fades while it is held (release sets how fast;
     // palm muting shortens it) and is damped right after it ends; otherwise the tails of fast riffs pile up
-    // into a noisy wash. High notes are turned down, as mixes written for the earlier plucked-string guitar
-    // expect: the recordings are even across the neck.
-    const decay = Math.max(0.06, tone.release * (1 - mute * 0.88)), tilt = Math.pow(10, -0.35 * (pitch - 57) / 20);
-    return sampledNote(synth, lane, t, part.instrument, pitch, velocity, duration, rng, { level: level * tilt, decay, release: Math.min(0.25, decay * 0.18), filter });
+    // into a noisy wash. High notes are turned down, as mixes written for the earlier plucked-string guitar expect.
+    const decay = Math.max(0.06, tone.release * (1 - mute * 0.88));
+    return { off, options: { decay, release: Math.min(0.25, decay * 0.18), filter, tiltDb: -0.35 * (pitch - 57) } };
   }
-  sampledNote(synth, lane, t, part.instrument, pitch, velocity, mute ? Math.min(duration, 0.06 + duration * (1 - mute)) : duration, rng, { level, release: (tone.release ?? 0.3) * (1 - mute * 0.8), attack: tone.attack ?? 0, doubled: tone.detune ?? 0, filter });
+  const length = off - start;
+  return { off: mute ? start + Math.min(length, 0.06 + length * (1 - mute)) : off, options: { release: (tone.release ?? 0.3) * (1 - mute * 0.8), attack: tone.attack ?? 0, doubled: tone.detune ?? 0, filter } };
 }
 
-function schedule(synth, lane, note, part, beatSeconds, rng, sound) {
-  const t = note.beat * beatSeconds, duration = note.duration * beatSeconds, velocity = note.velocity;
-  const tone = Object.fromEntries(Object.keys(presets.get(part.instrument).controls).map(name => [name, part.tone[name] ?? toneDefault(part.instrument, name, sound)]));
-  if (RECORDED[part.instrument] && sound === 'recorded') return recordedNote(synth, lane, part, t, note.pitch, velocity, duration, tone, rng);
+function schedulePacked(synth, lane, part, timeline, rng, library, end, tone) {
+  const level = PACKED[part.instrument].level;
+  if (part.instrument !== 'piano') {
+    const player = new RegionPlayer(synth, lane, library, part.instrument, { level, rng });
+    for (const note of part.notes) {
+      const t = timeline.seconds(note.beat);
+      if (t >= end) break;
+      const off = Math.max(t + 0.005, timeline.seconds(damperBeat(part, note.beat + note.duration)));
+      const { off: stop, options } = articulation(part, tone, note.pitch, t, off);
+      player.note(t, note.pitch, note.velocity, stop, options);
+    }
+    return;
+  }
+  const player = new PianoPlayer(synth, lane, library, { level, rng });
+  const pedal = [];
+  let previousUp = -Infinity;
+  for (const span of part.pedal ?? []) {
+    const down = Math.max(timeline.seconds(span.beat), previousUp + 0.06), up = timeline.seconds(span.beat + span.beats);
+    pedal.push([down, true], [up, false]);
+    previousUp = up;
+  }
+  let p = 0;
+  for (const note of part.notes) {
+    const t = timeline.seconds(note.beat);
+    if (t >= end) break;
+    while (p < pedal.length && pedal[p][0] <= t) { player.pedal(...pedal[p]); p++; }
+    player.note(t, note.pitch, note.velocity, Math.max(t + 0.005, timeline.seconds(damperBeat(part, note.beat + note.duration))));
+  }
+  for (; p < pedal.length; p++) if (pedal[p][0] < end) player.pedal(...pedal[p]);
+  player.finish();
+}
+
+const toneOf = (part, sound) => Object.fromEntries(Object.keys(presets.get(part.instrument).controls).map(name => [name, part.tone[name] ?? toneDefault(part.instrument, name, sound)]));
+
+function schedule(synth, lane, note, part, timeline, rng, sound) {
+  const t = timeline.seconds(note.beat), duration = timeline.seconds(note.beat + note.duration) - t, velocity = note.velocity;
+  const tone = toneOf(part, sound);
   const start = synth.pending.length;
   switch (part.instrument) {
     case 'electric-piano': instruments.epiano(synth, lane, t, note.pitch, velocity, duration); break;
@@ -190,7 +238,7 @@ async function loadSample(sample, sampleRate, bpm, projectDir, speech) {
  */
 export async function renderScore(score, options = {}) {
   const { from = 0, to } = options;
-  const compiled = compileScore(score), total = compiled.beats * 60 / compiled.bpm;
+  const compiled = compileScore(score), total = makeTimeline(compiled).duration;
   if (from === 0 && (to === undefined || to === total)) return renderRange(score, options);
   // An excerpt plays at the level of the whole track: render it all, master it once, then cut the excerpt.
   bounded(from, 0, total, 'from');
@@ -206,12 +254,21 @@ export async function renderScore(score, options = {}) {
   return { ...full, audio, report, ...(full.stems ? { stems: Object.fromEntries(Object.entries(full.stems).map(([id, stem]) => [id, cut(stem)])) } : {}) };
 }
 
-async function renderRange(score, { sampleRate = 44100, mix = {}, projectDir, stems = false, from = 0, to, progress, signal, speech, sound = 'recorded' } = {}) {
+async function renderRange(score, options = {}) {
+  const library = new SampleLibrary(options.samplesDir ?? defaultSamplesDir());
+  try {
+    return await renderWith(score, options, library);
+  } finally {
+    library.close();
+  }
+}
+
+async function renderWith(score, { sampleRate = 44100, mix = {}, projectDir, stems = false, from = 0, to, progress, signal, speech, sound = 'recorded' } = {}, library) {
   if (!SOUNDS.includes(sound)) throw new TypeError(`sound must be one of: ${SOUNDS.join(', ')}.`);
   const expandedScore = compileScore(score);
   bounded(sampleRate, RENDER_LIMITS.minSampleRate, RENDER_LIMITS.maxSampleRate, 'sampleRate');
   if (!Number.isInteger(sampleRate)) throw new TypeError('sampleRate must be an integer.');
-  const beatSeconds = 60 / expandedScore.bpm, duration = expandedScore.beats * beatSeconds;
+  const timeline = makeTimeline(expandedScore), duration = timeline.duration;
   bounded(from, 0, duration, 'from');
   bounded(to ?? duration, 0, duration, 'to');
   const end = to ?? duration;
@@ -224,6 +281,10 @@ async function renderRange(score, { sampleRate = 44100, mix = {}, projectDir, st
   };
   check('preparing', 0);
   const controls = mixControls(expandedScore, mix);
+  if (sound === 'recorded') {
+    const missing = library.missing(controls.parts.filter(part => part.audible && part.notes.length && PACKED[part.instrument]).flatMap(part => instrumentPacks(part.instrument)));
+    if (missing.length) throw new MissingSamplesError(missing, library.dir);
+  }
   const firstFrame = Math.round(from * sampleRate), lastFrame = Math.round(end * sampleRate);
   if (lastFrame <= firstFrame) throw new RangeError('Render range must contain at least one sample.');
   const frames = lastFrame - firstFrame;
@@ -236,18 +297,27 @@ async function renderRange(score, { sampleRate = 44100, mix = {}, projectDir, st
     const cutoff = part.tone.brightness ?? toneDefault(part.instrument, 'brightness', sound);
     const noiseHats = sound === 'synthesized' ? ['hi-hat', 'shaker', 'open-hat', 'closed-hat'] : ['hi-hat', 'shaker'];
     const filter = noiseHats.includes(part.instrument) ? { type: 'highpass', freq: 6500 } : part.instrument === 'clap' || part.instrument === 'snare' ? { type: 'bandpass', freq: 1800, q: 0.7 } : cutoff ? { type: 'lowpass', freq: cutoff } : null;
-    const lane = synth.lane({ gain: part.volume, pan: part.pan, filter, overdrive: part.instrument === 'guitar-crunch' ? (part.tone.drive ?? 0.7) : null });
+    const packed = sound === 'recorded' && PACKED[part.instrument];
+    // Recordings from packs keep their stereo picture (the crunch guitar's direct signal is mono and goes
+    // through the overdrive); the brightness control only filters when set below its top.
+    const laneFilter = packed ? (cutoff && cutoff < 20000 ? { type: 'lowpass', freq: cutoff } : null) : filter;
+    const lane = synth.lane({ stereo: !!packed && part.instrument !== 'guitar-crunch', gain: part.volume, pan: part.pan, filter: laneFilter, overdrive: part.instrument === 'guitar-crunch' ? (part.tone.drive ?? 0.7) : null });
     const rng = makeRng(hashSeed(expandedScore.seed, part.id));
     let sample, events;
     if (part.instrument === 'sample') {
-      sample = await loadSample(part.sample, sampleRate, expandedScore.bpm, projectDir, speech);
-      events = part.notes.filter(n => n.beat * beatSeconds < end).map(n => ({ start: Math.round(n.beat * beatSeconds * sampleRate), length: Math.min(sample.length, Math.round(n.duration * beatSeconds * sampleRate)), velocity: n.velocity }));
-    } else for (const note of part.notes) if (note.beat * beatSeconds < end) schedule(synth, lane, note, part, beatSeconds, rng, sound);
+      sample = await loadSample(part.sample, sampleRate, timeline.tempoAt(0), projectDir, speech);
+      events = part.notes.filter(n => timeline.seconds(n.beat) < end).map(n => ({ start: Math.round(timeline.seconds(n.beat) * sampleRate), length: Math.min(sample.length, Math.round((timeline.seconds(n.beat + n.duration) - timeline.seconds(n.beat)) * sampleRate)), velocity: n.velocity }));
+    } else if (packed) schedulePacked(synth, lane, part, timeline, rng, library, end, toneOf(part, sound));
+    else for (const note of part.notes) if (timeline.seconds(note.beat) < end) schedule(synth, lane, note, part, timeline, rng, sound);
     buses.push({ part, synth, sample, events, next: 0, active: [], left: new Float32Array(BLOCK), right: new Float32Array(BLOCK) });
     check('preparing', 0);
   }
-  const reverb = expandedScore.master.reverb > 0 ? new Reverb(sampleRate, { room: 0.75 }) : null;
-  const compressor = new Compressor(sampleRate, { threshold: -12, ratio: 2, knee: 6, makeupDb: 0 });
+  // Band music gets a gentle glue compressor; music without drums (piano, strings, ambient) keeps its full dynamics.
+  const banded = controls.parts.some(part => part.audible && part.notes.length && presets.get(part.instrument).drums);
+  const compressor = banded ? new Compressor(sampleRate, { threshold: -12, ratio: 2, knee: 6, makeupDb: 0 }) : null;
+  // The whole dry mix and reverb send first; the hall is convolved over the whole send afterwards.
+  const dry = firstFrame === 0 ? channels : [new Float32Array(lastFrame), new Float32Array(lastFrame)];
+  const sendAll = new Float32Array(lastFrame);
   const left = new Float32Array(BLOCK), right = new Float32Array(BLOCK), send = new Float32Array(BLOCK);
   for (let offset = 0; offset < lastFrame; offset += BLOCK) {
     const count = Math.min(BLOCK, lastFrame - offset);
@@ -281,24 +351,28 @@ async function renderRange(score, { sampleRate = 44100, mix = {}, projectDir, st
         }
       }
     }
-    if (reverb) reverb.process(send, count, left, right, expandedScore.master.reverb);
-    compressor.process(left, right, count);
-    for (let i = 0; i < count; i++) {
-      const frame = offset + i - firstFrame;
-      if (frame < 0) continue;
-      // File edges follow the complete musical timeline, not an excerpt boundary.
-      const time = (offset + i) / sampleRate;
-      const fade = Math.max(0, Math.min(1, time / 0.004, (duration - time - 1 / sampleRate) / 0.04));
-      channels[0][frame] = left[i] * fade;
-      channels[1][frame] = right[i] * fade;
-    }
+    dry[0].set(left.subarray(0, count), offset);
+    dry[1].set(right.subarray(0, count), offset);
+    sendAll.set(send.subarray(0, count), offset);
     if (offset % (BLOCK * 64) === 0) { check('rendering', Math.min(end, (offset + count) / sampleRate)); await yieldTurn(); }
+  }
+  convolveHall(sendAll, dry, sampleRate, expandedScore.master.reverb * HALL_LEVEL);
+  for (let offset = 0; compressor && offset < lastFrame; offset += BLOCK) {
+    const count = Math.min(BLOCK, lastFrame - offset);
+    compressor.process(dry[0].subarray(offset, offset + count), dry[1].subarray(offset, offset + count), count);
+  }
+  for (let frame = Math.max(0, firstFrame); frame < lastFrame; frame++) {
+    // File edges follow the complete musical timeline, not an excerpt boundary.
+    const time = frame / sampleRate;
+    const fade = Math.max(0, Math.min(1, time / 0.004, (duration - time - 1 / sampleRate) / 0.04));
+    channels[0][frame - firstFrame] = dry[0][frame] * fade;
+    channels[1][frame - firstFrame] = dry[1][frame] * fade;
   }
   const mastered = masterInPlace(channels, sampleRate, { volume: controls.volume / DEFAULT_MASTER_VOLUME });
   const report = analyzeAudio(channels, sampleRate);
   report.from = from;
   report.to = end;
-  report.sections = expandedScore.sections.map(s => ({ ...s, time: s.beat * beatSeconds, duration: s.beats * beatSeconds }));
+  report.sections = expandedScore.sections.map(s => ({ ...s, time: timeline.seconds(s.beat), duration: timeline.seconds(s.beat + s.beats) - timeline.seconds(s.beat) }));
   report.sound = sound;
   report.suggestions = arrangementSuggestions(expandedScore);
   report.loudness = mastered.loudness;
@@ -306,7 +380,7 @@ async function renderRange(score, { sampleRate = 44100, mix = {}, projectDir, st
   report.limitedFraction = mastered.limited;
   report.warnings = technicalWarnings(report);
   if (report.limitedFraction > 0.01) report.warnings.push({ code: 'squashed', message: 'The limiter turns more than 1% of the track down by over 3 dB, so loud moments sound squashed. Lower the loudest parts, usually drums or bass, and render again.' });
-  report.stemDescription = 'Dry stereo buses after part volume, pan and mute/solo, before the shared master reverb, compression, loudness matching and limiter. They do not sum to the mastered render.';
+  report.stemDescription = 'Dry stereo buses after part volume, pan and mute/solo, before the shared master reverb, compression (only in music with drums), loudness matching and limiter. They do not sum to the mastered render.';
   check('complete', end);
   return { audio: audioBuffer(channels, sampleRate), report, parts: expandedScore.parts.map(({ id, name, color }) => ({ id, name, color })), ...(stemBuffers ? { stems: Object.fromEntries(Object.entries(stemBuffers).map(([id, data]) => [id, audioBuffer(data, sampleRate)])) } : {}), expandedScore };
 }

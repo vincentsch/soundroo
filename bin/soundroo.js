@@ -8,7 +8,7 @@ import { createSpeech, transformSpeech } from '../src/voice.js';
 const args = process.argv.slice(2);
 const command = args.shift() ?? 'start';
 const options = {}, positional = [];
-const boolean = new Set(['json', 'examples', 'all', 'replace', 'stems', 'help', 'version', 'no-render', 'dry-run', 'rights-accepted', 'no-wait', 'force', 'confirm', 'start', 'wait', 'local-only', 'refresh', 'no-guest']);
+const boolean = new Set(['json', 'examples', 'all', 'replace', 'stems', 'help', 'version', 'no-render', 'dry-run', 'rights-accepted', 'no-wait', 'force', 'confirm', 'start', 'wait', 'local-only', 'refresh', 'no-guest', 'add']);
 // Optional network sharing; its code loads only for these commands.
 const network = new Set(['share', 'publish', 'login', 'logout', 'whoami', 'claim', 'claim-link', 'import', 'cloud']);
 try {
@@ -31,7 +31,9 @@ const directory = libraryPath(options.library ?? (['init', 'start', 'demo', 'lis
 const number = (key, fallback) => options[key] == null ? fallback : Number(options[key]);
 const exampleSeed = () => number('seed', (options.collection ?? 'variety') === 'variety' ? 21 : 1);
 function help() {
-  print(`Soundroo ${VERSION} — music made with your coding agent\n\nUse Node 22 or newer. No installation is needed for instrumental music.\n\n  node bin/soundroo.js start [library]       Open the local listening studio; first start loads ten examples\n  node bin/soundroo.js init [library]        Create an empty personal collection\n  node bin/soundroo.js demo [library]        Create and render the original example collection\n  node bin/soundroo.js add score.json        Add an editable composition (--replace revises it)\n  node bin/soundroo.js validate score.json   Check a composition before rendering\n  node bin/soundroo.js render [track-id]     Render a track, or --all; --stems exports its parts; --sound synthesized\n  node bin/soundroo.js inspect [track-id]    Inspect saved music and audio reports\n  node bin/soundroo.js list [library]        List the collection\n  node bin/soundroo.js catalog               Discover instruments and tone controls\n  node bin/soundroo.js example [id]          List the example tracks by genre, or print one to learn from\n  node bin/soundroo.js requests              Read pending musical briefs from the studio\n  node bin/soundroo.js doctor                Check the local runtime\n  node bin/soundroo.js version               Show the toolkit version and engine hash\n  node bin/soundroo.js voice create "words" --out library/assets/voice.wav\n  node bin/soundroo.js voice process voice.wav --effect vocoder --out processed.wav\n\nOptional sharing on soundroo.com (only these commands use the network; see docs/sharing.md):\n  node bin/soundroo.js share --dry-run       Preview what would be uploaded; nothing is sent or saved\n  node bin/soundroo.js share --rights-accepted   Publish the library and print its links\n  node bin/soundroo.js share status          Show this library's shared links\n  node bin/soundroo.js import LINK           Add an open track to the library as a remix\n  node bin/soundroo.js claim --email ADDRESS Email a link that keeps your guest artist page\n  node bin/soundroo.js login | logout | whoami | claim-link\n\nOptions: --library PATH, --json, --port NUMBER, --seed NUMBER, --title TEXT, --collection variety|open-window, --service URL.\nSpeech creation is optional and needs Kokoro; speech effects and bundled voice examples work with Node alone.\nThe studio creates no hidden model calls. Your existing coding agent composes and revises the music.`);
+  print(`Soundroo ${VERSION} — music made with your coding agent\n\nUse Node 22 or newer. No installation is needed: the recorded instruments download once, the first time a track uses them.\n\n  node bin/soundroo.js start [library]       Open the local listening studio; first start loads ten examples\n  node bin/soundroo.js init [library]        Create an empty personal collection\n  node bin/soundroo.js demo [library]        Create and render the original example collection\n  node bin/soundroo.js add score.json        Add an editable composition (--replace revises it)\n  node bin/soundroo.js validate score.json   Check a composition before rendering\n  node bin/soundroo.js render [track-id]     Render a track, or --all; --stems exports its parts; --sound synthesized\n  node bin/soundroo.js inspect [track-id]    Inspect saved music and audio reports\n  node bin/soundroo.js list [library]        List the collection\n  node bin/soundroo.js catalog               Discover instruments and tone controls\n  node bin/soundroo.js example [id]          List the example tracks by genre, or print one to learn from\n  node bin/soundroo.js requests              Read pending musical briefs from the studio\n  node bin/soundroo.js import-midi piece.mid  Turn a MIDI file into a score (--add puts it in the library)
+  node bin/soundroo.js samples [--all]       The recorded instruments: status, or download them now
+  node bin/soundroo.js doctor                Check the local runtime\n  node bin/soundroo.js version               Show the toolkit version and engine hash\n  node bin/soundroo.js voice create "words" --out library/assets/voice.wav\n  node bin/soundroo.js voice process voice.wav --effect vocoder --out processed.wav\n\nOptional sharing on soundroo.com (apart from that one download, only these commands use the network; see docs/sharing.md):\n  node bin/soundroo.js share --dry-run       Preview what would be uploaded; nothing is sent or saved\n  node bin/soundroo.js share --rights-accepted   Publish the library and print its links\n  node bin/soundroo.js share status          Show this library's shared links\n  node bin/soundroo.js import LINK           Add an open track to the library as a remix\n  node bin/soundroo.js claim --email ADDRESS Email a link that keeps your guest artist page\n  node bin/soundroo.js login | logout | whoami | claim-link\n\nOptions: --library PATH, --json, --port NUMBER, --seed NUMBER, --title TEXT, --collection variety|open-window, --service URL.\nSpeech creation is optional and needs Kokoro; speech effects and bundled voice examples work with Node alone.\nThe studio creates no hidden model calls. Your existing coding agent composes and revises the music.`);
 }
 
 try {
@@ -40,8 +42,16 @@ try {
   else if (command === 'doctor') {
     const major = Number(process.versions.node.split('.')[0]);
     const checks = [{ name: 'Node 22+', ok: major >= 22, version: process.version }, { name: 'Studio files', ok: fs.existsSync(new URL('../web/index.html', import.meta.url)) }, { name: 'Score renderer', ok: fs.existsSync(new URL('../src/render.js', import.meta.url)) }];
-    print({ ready: checks.every(c => c.ok), checks, requiredMusicTools: [], optionalSpeech: 'Install Kokoro only for creating new spoken phrases.' });
+    const { samples } = await import('../src/headless.js');
+    const packs = samples();
+    print({ ready: checks.every(c => c.ok), checks, requiredMusicTools: [], recordedInstruments: { installed: packs.filter(p => p.installed).map(p => p.name), missing: packs.filter(p => !p.installed).map(p => p.name), note: 'Missing recordings download by themselves the first time a track needs them (node bin/soundroo.js samples --all gets them all).' }, optionalSpeech: 'Install Kokoro only for creating new spoken phrases.' });
     if (checks.some(c => !c.ok)) process.exitCode = 1;
+  } else if (command === 'samples') {
+    // The recorded instruments: their status, or download them (all, or the named packs).
+    const { samples, installSamples } = await import('../src/headless.js');
+    const names = positional.length ? positional : options.all ? undefined : null;
+    const packs = names === null ? samples() : await installSamples(names, { log });
+    print(options.json ? { packs } : packs.map(p => `${p.installed ? 'installed' : 'missing  '}  ${p.name.padEnd(14)} ${(p.size / 1e6).toFixed(0).padStart(5)} MB  ${p.instruments.join(', ')}`).join('\n') + (names === null && packs.some(p => !p.installed) ? '\n\nThey download by themselves the first time a track needs them. To get them all now: node bin/soundroo.js samples --all' : ''));
   } else if (command === 'init') {
     const collection = await initLibrary(directory, { examples: Boolean(options.examples), exampleSet: options.collection ?? 'variety', seed: exampleSeed(), title: options.title ?? 'Your music', description: options.description ?? '' });
     print({ directory, collection });
@@ -67,6 +77,18 @@ try {
   } else if (command === 'add') {
     if (!positional[0]) throw new Error('Choose a JSON score file to add.');
     print({ id: await addTrack(directory, positional[0], { replace: Boolean(options.replace) }), directory });
+  } else if (command === 'import-midi') {
+    // A MIDI file as an editable version 3 score; --add puts it in the library too.
+    if (!positional[0]) throw new Error('Choose a .mid file to import.');
+    const { midiToScore } = await import('../src/audio/midi-import.js');
+    const { validateScore } = await import('../src/score.js');
+    const { score, skipped } = midiToScore(fs.readFileSync(positional[0]), { title: options.title, id: options.id ?? path.basename(positional[0]).replace(/\.midi?$/i, '') });
+    const { valid, issues } = validateScore(score);
+    if (!valid) throw new Error(`The imported score is not valid: ${issues.slice(0, 5).map(i => `${i.path}: ${i.message}`).join('; ')}`);
+    const out = options.out ?? path.join(path.dirname(positional[0]), `${score.id}.json`);
+    fs.writeFileSync(out, JSON.stringify(score, null, 2) + '\n');
+    const added = options.add ? await addTrack(directory, out, { replace: Boolean(options.replace) }) : null;
+    print({ file: out, id: score.id, parts: score.parts.map(p => ({ id: p.id, instrument: p.instrument, notes: p.notes.length, pedal: p.pedal?.length ?? 0 })), tempoChanges: score.tempo?.length ?? 0, skippedDrumNotes: skipped, ...(added ? { added, directory } : {}) });
   } else if (command === 'validate') {
     if (!positional[0]) throw new Error('Choose a JSON score file to validate.');
     const { validateScore } = await import('../src/score.js'); const result = validateScore(JSON.parse(fs.readFileSync(positional[0], 'utf8'))); print(result); if (!result.valid) process.exitCode = 2;

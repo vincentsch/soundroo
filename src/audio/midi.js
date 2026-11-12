@@ -14,13 +14,31 @@ function metadata(type, text) {
   return Buffer.concat([Buffer.from([255, type]), variable(bytes.length), bytes]);
 }
 
+function tempoEvent(bpm) {
+  const bytes = Buffer.alloc(6); bytes.set([255, 81, 3]); bytes.writeUIntBE(Math.round(60000000 / bpm), 3, 3);
+  return bytes;
+}
+// MIDI has no tempo glide; a ramp becomes a tempo change every sixteenth note.
+const RAMP_STEP = 0.25;
+
 // A standard format-1 MIDI file with a conductor track and one track per part.
-// Callers pass normalized note events in quarter-note beats.
-export function encodeMidi({ title = 'Soundroo', bpm = 120, tracks = [], sections = [] }) {
+// Callers pass normalized note events in quarter-note beats, tempo changes
+// [{beat, bpm, ramp}] after beat 0 and per track sustain-pedal spans [{beat, beats}].
+export function encodeMidi({ title = 'Soundroo', bpm = 120, tempo = [], tracks = [], sections = [] }) {
   if (!Number.isFinite(bpm) || bpm < 20 || bpm > 400) throw new Error('MIDI tempo must be between 20 and 400 BPM.');
   if (tracks.length > 64) throw new Error('MIDI export supports at most 64 instrument tracks.');
-  const tempo = Buffer.alloc(6); tempo.set([255, 81, 3]); tempo.writeUIntBE(Math.round(60000000 / bpm), 3, 3);
-  const conductor = [{ tick: 0, bytes: metadata(3, title), order: 0 }, { tick: 0, bytes: tempo, order: 1 }];
+  const conductor = [{ tick: 0, bytes: metadata(3, title), order: 0 }, { tick: 0, bytes: tempoEvent(bpm), order: 1 }];
+  let previous = { beat: 0, bpm };
+  for (const change of tempo) {
+    if (change.ramp) {
+      for (let beat = previous.beat + RAMP_STEP; beat < change.beat - 1e-9; beat += RAMP_STEP) {
+        const value = previous.bpm + (change.bpm - previous.bpm) * (beat - previous.beat) / (change.beat - previous.beat);
+        conductor.push({ tick: Math.round(beat * DIVISION), bytes: tempoEvent(value), order: 1 });
+      }
+    }
+    conductor.push({ tick: Math.round(change.beat * DIVISION), bytes: tempoEvent(change.bpm), order: 1 });
+    previous = change;
+  }
   for (const section of sections) conductor.push({ tick: Math.round(section.beat * DIVISION), bytes: metadata(6, section.name), order: 2 });
   const makeTrack = events => {
     events.sort((a, b) => a.tick - b.tick || a.order - b.order);
@@ -51,6 +69,11 @@ export function encodeMidi({ title = 'Soundroo', bpm = 120, tracks = [], section
       const end = Math.max(start + 1, Math.round((beat + duration) * DIVISION));
       events.push({ tick: start, bytes: Buffer.from([144 | resolved, pitch, Math.max(1, Math.round(velocity * 127))]), order: 3 });
       events.push({ tick: end, bytes: Buffer.from([128 | resolved, pitch, 0]), order: 2 });
+    }
+    // The sustain pedal is controller 64: up before down at the same tick, so touching spans lift it briefly.
+    for (const span of track.pedal ?? []) {
+      events.push({ tick: Math.round(span.beat * DIVISION), bytes: Buffer.from([176 | resolved, 64, 127]), order: 2.5 });
+      events.push({ tick: Math.round((span.beat + span.beats) * DIVISION), bytes: Buffer.from([176 | resolved, 64, 0]), order: 1.5 });
     }
     body.push(makeTrack(events));
   }

@@ -115,6 +115,35 @@ export class Env {
 
 // --- oscillator helpers -----------------------------------------------------------
 
+// Recordings are pitched with 16-point Kaiser-windowed sinc interpolation:
+// flat to 16 kHz and free of the treble loss and aliasing a short polynomial
+// adds. SINC holds the 16 weights for each of 2048 fractional positions.
+export const SINC_TAPS = 16;
+const SINC_PHASES = 2048;
+const SINC = (() => {
+  const half = SINC_TAPS / 2, cutoff = 0.46, beta = 8;
+  const bessel = x => { let sum = 1, term = 1; for (let k = 1; k < 32; k++) { term *= (x / (2 * k)) ** 2; sum += term; } return sum; };
+  const table = new Float32Array((SINC_PHASES + 1) * SINC_TAPS);
+  for (let p = 0; p <= SINC_PHASES; p++) {
+    const f = p / SINC_PHASES, weights = [];
+    for (let j = 0; j < SINC_TAPS; j++) {
+      const x = j - half + 1 - f;
+      const sinc = x === 0 ? 2 * cutoff : Math.sin(2 * Math.PI * cutoff * x) / (Math.PI * x);
+      weights.push(Math.abs(x) >= half ? 0 : sinc * bessel(beta * Math.sqrt(1 - (x / half) ** 2)) / bessel(beta));
+    }
+    const sum = weights.reduce((a, b) => a + b, 0);
+    weights.forEach((w, j) => { table[p * SINC_TAPS + j] = w / sum; });
+  }
+  return table;
+})();
+
+// 4-point, 3rd-order Hermite interpolation between d[j] and d[j + 1].
+function hermite(d, jm, j, f) {
+  const xm1 = d[jm], x0 = d[j], x1 = d[j + 1], x2 = d[j + 2];
+  const c1 = 0.5 * (x1 - xm1), c2 = xm1 - 2.5 * x0 + 2 * x1 - 0.5 * x2, c3 = 0.5 * (x2 - xm1) + 1.5 * (x0 - x1);
+  return ((c3 * f + c2) * f + c1) * f + x0;
+}
+
 function polyblep(t, dt) {
   if (t < dt) {
     t /= dt;
@@ -127,7 +156,7 @@ function polyblep(t, dt) {
   return 0;
 }
 
-export const WAVES = { sine: 0, saw: 1, tri: 2, square: 3, noise: 4, pink: 5, sample: 6, string: 7 };
+export const WAVES = { sine: 0, saw: 1, tri: 2, square: 3, noise: 4, pink: 5, sample: 6, string: 7, stream: 8 };
 
 // --- biquad (RBJ cookbook) ------------------------------------------------------------
 
@@ -198,6 +227,8 @@ export class Voice {
     this.filter = null;
     this.pan = 0;
     this.panEnv = null;
+    // A stereo voice plays a recording's two channels into a stereo lane.
+    this.stereo = false;
   }
   layer(spec) {
     this.layers.push(spec);
@@ -356,6 +387,7 @@ export class Lane {
     this.panLfo = spec.panLfo || null;
     this.send = spec.reverb || 0;
     this.filter = spec.filter ? makeFilter(spec.filter.type, spec.filter.freq, spec.filter.q ?? 0.707) : null;
+    this.filterR = spec.filter && this.stereo ? makeFilter(spec.filter.type, spec.filter.freq, spec.filter.q ?? 0.707) : null;
     this.filterLfo = spec.filter && spec.filter.lfo ? spec.filter.lfo : null;
     this.overdrive = spec.overdrive ?? null;
     this.drivePrevious = 0;
@@ -384,17 +416,28 @@ export class Lane {
 
   // Mixes the block into the synth's dry buffers and the reverb input.
   mix(i0, n, dryL, dryR, send) {
-    if (!this.dirty && !this.pumpTimes && (!this.filter || (Math.abs(this.filter.z1) < 1e-12 && Math.abs(this.filter.z2) < 1e-12))) return;
+    const quiet = f => !f || (Math.abs(f.z1) < 1e-12 && Math.abs(f.z2) < 1e-12);
+    if (!this.dirty && !this.pumpTimes && quiet(this.filter) && quiet(this.filterR)) return;
     const sr = this.synth.sr;
     const tMid = (i0 + n / 2) / sr;
     const g = this.gain;
     if (this.stereo) {
       const L = this.L;
       const R = this.R;
+      if (this.filter) {
+        for (const [f, buffer] of [[this.filter, L], [this.filterR, R]]) {
+          if (f.freq !== f.lastF) { biquadCoefs(f.type, f.freq, f.q, sr, f); f.lastF = f.freq; }
+          biquadRun(f, buffer, 0, n);
+        }
+      }
+      // Panning a stereo recording moves its whole picture: toward the right,
+      // the left channel blends into the right one rather than disappearing.
+      const p = Math.max(-1, Math.min(1, this.panBase));
+      const ll = g * (p > 0 ? 1 - p : 1), lr = g * (p < 0 ? -p : 0), rr = g * (p < 0 ? 1 + p : 1), rl = g * (p > 0 ? p : 0);
       const s = this.send;
       for (let k = 0; k < n; k++) {
-        const l = L[k] * g;
-        const r = R[k] * g;
+        const l = L[k] * ll + R[k] * lr;
+        const r = R[k] * rr + L[k] * rl;
         dryL[k] += l;
         dryR[k] += r;
         if (s) send[k] += (l + r) * 0.5 * s;
@@ -473,6 +516,7 @@ export class Synth {
     }
     this.send = new Float32Array(BLOCK);
     this.acc = new Float32Array(BLOCK);
+    this.accR = new Float32Array(BLOCK);
     this.tmp = new Float32Array(BLOCK);
     this.amp = new Float32Array(BLOCK);
     this.fq = new Float32Array(BLOCK);
@@ -530,6 +574,10 @@ export class Synth {
       const f = v.filter;
       Object.assign(f, { b0: 1, b1: 0, b2: 0, a1: 0, a2: 0, z1: 0, z2: 0, lastF: -1 });
       if (f.freqEnv) f.freqEnv.begin(sr, v.start);
+      if (v.stereo) {
+        v.filterR = { ...f, z1: 0, z2: 0, lastF: -1 };
+        if (f.freqEnv) v.filterR.freqEnv = null;
+      }
     }
     if (v.panEnv) v.panEnv.begin(sr, v.start);
   }
@@ -541,9 +589,11 @@ export class Synth {
     if (cnt <= 0) return;
     const sr = this.sr;
     const acc = this.acc;
+    const accR = this.accR;
     const amp = this.amp;
     const fq = this.fq;
     acc.fill(0, 0, cnt);
+    if (v.stereo) accR.fill(0, 0, cnt);
     for (const L of v.layers) {
       L.amp.fill(amp, cnt);
       if (L.freqEnv) L.freqEnv.fill(fq, cnt);
@@ -683,6 +733,31 @@ export class Synth {
           L.pos = pos;
           break;
         }
+        case 8: { // recording read from its pack while it plays, windowed-sinc pitching, optional loop, mono or stereo
+          const source = L.source, step = L.step * mul, loop = L.loop, last = source.frames;
+          let pos = L.pos;
+          if (!loop) source.ensure(Math.floor(pos) - SINC_TAPS / 2, Math.ceil(pos + step * cnt) + SINC_TAPS / 2 + 1);
+          const base = source.base, left = source.data[0], right = source.data[1] ?? left, S = SINC;
+          // Stereo voices fill both accumulators; a mono lane takes the average of the channels.
+          const both = v.stereo, two = right !== left, exact = step === 1 && pos === Math.floor(pos);
+          const offset = 1 - SINC_TAPS / 2 - base;
+          for (let k = 0; k < cnt; k++) {
+            if (loop !== null && loop !== undefined && pos >= loop[1]) pos -= loop[1] - loop[0];
+            const i = pos | 0;
+            if (i >= last) break;
+            const a = amp[k];
+            let l, r;
+            if (exact) { l = left[i - base]; r = right[i - base]; } else {
+              const w = ((pos - i) * SINC_PHASES + 0.5 | 0) * SINC_TAPS, f = i + offset;
+              l = S[w + 0] * left[f + 0] + S[w + 1] * left[f + 1] + S[w + 2] * left[f + 2] + S[w + 3] * left[f + 3] + S[w + 4] * left[f + 4] + S[w + 5] * left[f + 5] + S[w + 6] * left[f + 6] + S[w + 7] * left[f + 7] + S[w + 8] * left[f + 8] + S[w + 9] * left[f + 9] + S[w + 10] * left[f + 10] + S[w + 11] * left[f + 11] + S[w + 12] * left[f + 12] + S[w + 13] * left[f + 13] + S[w + 14] * left[f + 14] + S[w + 15] * left[f + 15];
+              r = two ? S[w + 0] * right[f + 0] + S[w + 1] * right[f + 1] + S[w + 2] * right[f + 2] + S[w + 3] * right[f + 3] + S[w + 4] * right[f + 4] + S[w + 5] * right[f + 5] + S[w + 6] * right[f + 6] + S[w + 7] * right[f + 7] + S[w + 8] * right[f + 8] + S[w + 9] * right[f + 9] + S[w + 10] * right[f + 10] + S[w + 11] * right[f + 11] + S[w + 12] * right[f + 12] + S[w + 13] * right[f + 13] + S[w + 14] * right[f + 14] + S[w + 15] * right[f + 15] : l;
+            }
+            if (both) { acc[k] += l * a; accR[k] += r * a; } else acc[k] += 0.5 * (l + r) * a;
+            pos += step;
+          }
+          L.pos = pos;
+          break;
+        }
         case 7: { // fractional-delay Karplus–Strong plucked string
           const buffer = L.string, length = buffer.length;
           let index = L.stringIndex, previous = L.stringPrevious;
@@ -725,13 +800,26 @@ export class Synth {
           f.lastF = f.freq;
         }
         biquadRun(f, acc, 0, cnt);
+        if (v.stereo) {
+          const g = v.filterR;
+          if (g.lastF !== g.freq) { biquadCoefs(g.type, g.freq, g.q, sr, g); g.lastF = g.freq; }
+          biquadRun(g, accR, 0, cnt);
+        }
       }
     }
 
     const lane = v.lane;
     lane.dirty = true;
     const off = a - i0;
-    if (lane.stereo) {
+    if (v.stereo) {
+      if (lane.stereo) {
+        const L = lane.L, R = lane.R;
+        for (let k = 0; k < cnt; k++) { L[off + k] += acc[k]; R[off + k] += accR[k]; }
+      } else {
+        const m = lane.mono;
+        for (let k = 0; k < cnt; k++) m[off + k] += 0.5 * (acc[k] + accR[k]);
+      }
+    } else if (lane.stereo) {
       const pan = this.pan;
       if (v.panEnv) v.panEnv.fill(pan, cnt);
       const L = lane.L;
@@ -763,7 +851,11 @@ export class Synth {
     }
     for (const lane of this.lanes) lane.clear(n);
     for (const v of this.active) this._renderVoice(v, i0, n);
-    if (this.active.length) this.active = this.active.filter((v) => v.end > end);
+    if (this.active.length) {
+      // A finished voice lets go of the recording window it was reading.
+      for (const v of this.active) if (v.end <= end) for (const layer of v.layers) if (layer.source && !layer.source.whole) layer.source.data = null;
+      this.active = this.active.filter((v) => v.end > end);
+    }
 
     const send = this.send;
     send.fill(0, 0, n);

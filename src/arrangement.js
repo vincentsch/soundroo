@@ -3,6 +3,7 @@
 // that all sound the same, a silent ending). They are hints, not errors: a
 // slow intro or a steady loop is fine when the person asked for it.
 import { getCatalog } from './catalog.js';
+import { makeTimeline } from './timeline.js';
 
 const DRUMS = new Set(getCatalog().instruments.filter(preset => preset.drums).map(preset => preset.id));
 const BASSES = new Set(['bass', 'acid-bass', 'electric-bass', 'chip-bass']);
@@ -53,7 +54,7 @@ function silentEnd(score) {
   const notes = score.parts.flatMap(part => part.notes);
   if (!notes.length) return null;
   const end = Math.max(...notes.map(note => note.beat + note.duration));
-  const silence = (score.beats - end) * 60 / score.bpm;
+  const timeline = makeTimeline(score), silence = timeline.duration - timeline.seconds(end);
   if (silence < SILENT_END_SECONDS) return null;
   return { code: 'silent_end', message: `The last ${Math.round(silence)} seconds are silent. Set beats to where the music ends, plus a short tail.` };
 }

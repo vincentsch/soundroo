@@ -9,3 +9,4 @@ coverage/
 library/
 dist/
 cloud-cli/dist/
+__pycache__/

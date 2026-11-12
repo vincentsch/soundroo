@@ -31,22 +31,39 @@ For a revision, change the score or its script, use `add --replace`, then render
 
 ## Score format
 
-Every score uses `version: 1`, or `version: 2` for the compact pattern strings below, a lowercase slug `id`, a title, `bpm`, the total length in quarter-note `beats`, and an array of instrument `parts`. Useful metadata includes `description`, `genre`, `mood`, `key`, an integer `seed`, and named `sections`.
+Every score uses `version: 1`, `version: 2` for the compact pattern strings below, or `version: 3` for those plus tempo changes and the sustain pedal, a lowercase slug `id`, a title, `bpm`, the total length in quarter-note `beats`, and an array of instrument `parts`. Useful metadata includes `description`, `genre`, `mood`, `key`, an integer `seed`, and named `sections`.
 
 | Field | Meaning |
 | --- | --- |
-| `bpm` | Tempo from 20 to 400 beats per minute. |
+| `bpm` | Tempo from 20 to 400 beats per minute at beat 0. |
+| `tempo` | Version 3: tempo changes `{beat, bpm, ramp}` after beat 0. `ramp: true` glides from the tempo before it and arrives at `bpm` on that beat (a ritardando or accelerando). |
 | `beats` | Total score length in quarter-note beats. Leave space for musical release and the ending. |
 | `sections` | `{id, name, beat, beats}`; section starts and lengths use beats. |
 | `master` | `{volume, reverb}`; volume 0–2, reverb 0–1. |
-| `parts` | `{id, name, instrument, volume, pan, color, tone, notes, patterns, clips, sample}`. |
+| `parts` | `{id, name, instrument, volume, pan, color, tone, notes, patterns, clips, sample, pedal}`. |
+| `pedal` | Version 3: sustain pedal spans `{beat, beats}` in which the pedal is down. A note released inside a span rings until the pedal comes up. Spans that touch are a pedal change: the dampers fall between them. Patterns can carry `pedal` too; clips repeat it. |
 | `notes` | `{pitch, beat, duration, velocity}`. Pitch is a MIDI integer or scientific pitch such as `F#4`; velocity is greater than 0 and at most 1. |
 | `patterns` | Named blocks `{name: {beats, notes}}` with timing relative to the block. Version 2 adds `line`, `steps` and `pitch`. |
 | `clips` | `{pattern, beat, repeat, transpose, velocity}`; repeat and transpose a named pattern at a score position. |
 | `tone` | Instrument-specific controls. Discover names and supported ranges with `catalog`. |
 | `artwork` | Optional sleeve metadata: `{style, colors: [background, ink, accent], seed}`. Colors use six-digit hex. |
 
-The renderer validates timing, identities, ranges, supported controls and expansion limits. Scores support up to ten minutes, 64 parts and 100,000 expanded note events.
+The renderer validates timing, identities, ranges, supported controls and expansion limits. Scores support up to ten minutes (counted with their tempo changes), 64 parts and 100,000 expanded note events.
+
+### Expressive timing and the pedal (version 3)
+
+Piano music lives on the sustain pedal and on timing that breathes. Pedal once per harmony: a span from where the chord starts to just before the next one, so the next span begins where this one ends and the dampers clear the old harmony. Without a pedal, a piano note stops when its `duration` ends. The highest notes (from F#6 up) have no dampers and ring on whatever the pedal does, as on a real piano.
+
+```json
+"tempo": [{"beat": 56, "bpm": 112}, {"beat": 64, "bpm": 72, "ramp": true}],
+"parts": [{"id": "piano", "instrument": "piano", "notes": [], "pedal": [{"beat": 0, "beats": 2}, {"beat": 2, "beats": 2}]}]
+```
+
+Use tempo changes for the large shape (a slower bridge, a ritardando into the last chord) and fractional beats and velocities for the small one: a melody note placed a little late, an inner voice softer than the tune.
+
+### Importing MIDI
+
+Any program that writes standard MIDI files can compose for Soundroo. `node bin/soundroo.js import-midi piece.mid --title "Piece" --add --library library/my-music` turns a MIDI file into a version 3 score and adds it to the library: notes keep their exact timing, velocity and length; tempo changes, the sustain pedal (controller 64) and markers (as sections) come along. General MIDI programs choose the closest Soundroo instrument (pianos, guitars, basses, strings, brass, organ, pads, leads), and drums on channel 10 become the acoustic kit. Without `--add` the score is only written next to the MIDI file, to edit first. A script can write the MIDI with any library, or write the score JSON directly.
 
 ## Compact notation (version 2)
 
@@ -74,7 +91,7 @@ Part volume defaults to 1 and master volume to 0.8. The mix controls use the sam
 
 Run `node bin/soundroo.js catalog --json` for the authoritative instrument names and controls. Instruments include `piano`, `electric-piano`, `organ`, `strings`, `brass`, `pad`, `pluck`, `bass`, `electric-bass`, `bell`, `marimba`, `analog-lead`, `fm-lead`, `acid-bass`, `guitar-clean`, `guitar-crunch`, two drum kits, `noise`, and `sample`.
 
-The piano, strings, brass, guitars, electric bass and the acoustic drum kit play recordings of real instruments (see `assets/samples/SOURCES.md`); the rest are synthesized. Recorded notes sound most natural inside the instrument's real range: piano A0 to C8, bass E1 to C4, guitar E2 to C6, strings C2 to D6, brass E♭2 to A5.
+The piano, strings, brass, guitars, electric bass and the acoustic drum kit play full recordings of real instruments in stereo (see `assets/samples/SOURCES.md`); the rest are synthesized. The grand piano has sixteen recorded loudness layers per note, its natural decay, and the sounds of its dampers, hammers and pedal. Drums, bass and guitars choose among several recorded takes, so repeated notes never sound copied. The recordings are about 4 GB; the toolkit downloads the ones a track needs the first time it renders it (or all of them with `node bin/soundroo.js samples --all`) and keeps them in your cache folder. Recorded notes sound most natural inside the instrument's real range: piano A0 to C8, bass E1 to C4, guitar E2 to C6, strings C2 to D6, brass E♭2 to A5.
 
 For guitar-led music, use `guitar-clean`, `guitar-crunch` and `electric-bass`. Crunch guitar runs a recorded guitar through overdrive and cabinet filtering before its mix fader; power chords (root, fifth and octave) sound biggest. `brightness`, `release`, `palmMute` and, for crunch, `drive` shape the articulation. Use short palm-muted notes for riffs and alternating bass; release the mute for sustained choruses. Strum chord notes a few milliseconds apart. Guitar notes typically sit between E2 and E6; bass generally sits an octave lower. Keep riffs and lead hooks out of each other's way. Crunch overdrive compresses velocity accents; use clean guitar or part balance for more pronounced dynamics.
 
@@ -82,7 +99,7 @@ There are two drum kits. The acoustic kit is recorded: `rock-kick`, `rock-snare`
 
 For video game music, `chip-lead` is a pulse wave like the sound chips in 8-bit consoles. Its `duty` sets the pulse width: 0.125 is thin and nasal, 0.25 the classic lead, 0.5 a hollow square. `chip-bass` is a triangle bass. Use them with `kick`, `snare` and `hi-hat`, fast sixteenth-note arpeggios and little reverb. [`examples/pixel-grand-prix.json`](../examples/pixel-grand-prix.json) is a complete 8-bit racing theme.
 
-Velocity picks the recorded layer: soft notes sound softer, not just quieter. Strings and brass hold long notes steadily; their `detune` doubles the section with a second take, and `attack` adds a slower swell. Electronic timbres, mallets, textures and processed speech are synthesized.
+Velocity picks the recorded layer: soft notes sound softer, not just quieter. Strings and brass hold long notes steadily; their `detune` doubles the section with a second take, and `attack` adds a slower swell. Cymbals ring out in full; a new hit on the same cymbal takes over from its oldest ringing. The recorded instruments play unfiltered; `brightness` darkens them only when set below 20000. Electronic timbres, mallets, textures and processed speech are synthesized.
 
 Every score can also play with all instruments synthesized: `node bin/soundroo.js render <track> --sound synthesized` saves that version beside the recorded one. soundroo.com renders both, and listeners switch between them in the player. Write for the recorded instruments; the synthesized version follows the same notes.
 
@@ -128,7 +145,7 @@ The studio's player volume changes listening only. Saved mixer values change the
 
 ## Check and listen
 
-Use validation before rendering. Every render is mastered: a high-pass below 30 Hz, the same loudness for every track (about -14 LUFS, the level streaming services play at; the report's `loudness`) and a limiter that keeps peaks at -1 dBFS. Part volumes set the balance between parts. A master volume below the default 0.8 makes the whole track quieter; a higher one changes nothing. `limitedFraction` is the share of the track the limiter turns down by more than 3 dB; a track with sharp peaks is first played a little quieter, and if that is not enough the report warns that loud moments sound squashed. Lower the loudest parts then, usually drums or bass.
+Use validation before rendering. The master reverb is a concert hall (`master.reverb` sets how much of it you hear). Music with drums gets a gentle glue compressor; music without drums keeps its full dynamics. Every render is mastered: a high-pass below 30 Hz, the same loudness for every track (about -14 LUFS, the level streaming services play at; the report's `loudness`) and a limiter that keeps peaks at -1 dBFS. Part volumes set the balance between parts. A master volume below the default 0.8 makes the whole track quieter; a higher one changes nothing. `limitedFraction` is the share of the track the limiter turns down by more than 3 dB; a track with sharp peaks is first played a little quieter, and if that is not enough the report warns that loud moments sound squashed. Lower the loudest parts then, usually drums or bass.
 
 The report's `suggestions` point at arrangement problems listeners notice: drums and bass that only come in after bar eight, the same four bars repeated unchanged for 24 bars or more, sections that all use the same parts, and a long silent ending. Fix them unless the person asked for exactly that.
 

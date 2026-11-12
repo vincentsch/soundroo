@@ -1,6 +1,6 @@
 # Headless engine
 
-`src/headless.js` is Soundroo's engine without the music library, studio or CLI. A server, worker or test passes score JSON and receives validation issues, WAV bytes and render reports, MIDI, record sleeves and identities. It needs Node 22 or newer and no npm packages. Only speech recipes load the optional local Kokoro runtime.
+`src/headless.js` is Soundroo's engine without the music library, studio or CLI. A server, worker or test passes score JSON and receives validation issues, WAV bytes and render reports, MIDI, record sleeves and identities. It needs Node 22 or newer and no npm packages. Only speech recipes load the optional local Kokoro runtime. The recorded instruments play from sample packs that are installed once (see [Recorded instruments](#recorded-instruments)); renders never download.
 
 The CLI and studio render through the same functions, so a headless render of a library score and mix produces the same WAV bytes, report and revision as `render` writes into `tracks/<id>/renders/`.
 
@@ -9,8 +9,9 @@ import * as soundroo from './src/headless.js';
 
 const check = soundroo.validate(score);
 if (!check.valid) return { error: check.issues };            // [{path, message}]
+await soundroo.prepareSamples(score, { samplesDir });        // downloads missing instrument packs once
 await soundroo.prepareSpeech(score, { cacheDir });           // only scores with speech recipes
-const { wav, report, revision } = await soundroo.render(score, { mix, speech: { cacheDir, synthesize: false } });
+const { wav, report, revision } = await soundroo.render(score, { mix, samplesDir, speech: { cacheDir, synthesize: false } });
 const midi = soundroo.midi(score);                           // Buffer
 const svg = soundroo.sleeve(score, { index: 0, artwork });   // string
 const fingerprint = soundroo.fingerprint(score);             // 'fp1:…'
@@ -34,8 +35,13 @@ const fingerprint = soundroo.fingerprint(score);             // 'fp1:…'
 | `validateArtwork(artwork)` | `{valid, issues}` for `{style, colors, seed}`. |
 | `speechRecipes(score, {cacheDir})` | `[{key, text, voice, file, cached}]` for each distinct recipe. |
 | `prepareSpeech(score, options)` | Speaks uncached recipes and returns them with `synthesized`. |
+| `samples({samplesDir})` | `[{name, file, size, installed, instruments}]` for every sample pack. |
+| `samplePacks(score)` | The names of the packs a score's recorded instruments play from. |
+| `prepareSamples(score, options)` | Downloads the packs a score needs that are missing, and checks them. |
+| `installSamples(names, options)` | Downloads the named packs (all when `names` is omitted). |
+| `defaultSamplesDir()` | `SOUNDROO_SAMPLES_DIR`, else `soundroo/samples` in the user's cache folder. |
 
-`compile` returns version 1 shaped JSON for both score versions: defaults filled, clips and pattern strings expanded into sorted notes, patterns and clips removed. A version 2 score without speech therefore compiles into a score older engines can also render.
+`compile` returns the expanded score for every version: defaults filled, clips and pattern strings expanded into sorted notes and pedal spans, patterns and clips removed, `tempo` and each part's `pedal` as lists. It says `version: 1` unless it uses tempo changes or the pedal, then `version: 3`. A version 2 score without speech therefore compiles into a score older engines can also render.
 
 ## Rendering
 
@@ -50,6 +56,7 @@ const fingerprint = soundroo.fingerprint(score);             // 'fp1:…'
 | `sound` | `recorded` (default) or `synthesized`: every instrument synthesized, as engines before 0.6.0 played them. Same timeline and mastering; the revision stays the same. |
 | `projectDir` | Library folder for `assets/` WAVs. Network scores should not use local WAVs. |
 | `speech` | `{cacheDir, synthesize, modelDir, offline, log}` for speech recipes. |
+| `samplesDir` | Folder of the installed sample packs. Default `defaultSamplesDir()`. |
 | `progress`, `signal` | Progress callback and AbortSignal, as in `renderScore`. |
 
 `wav` is a 16-bit stereo PCM WAV `Buffer`. The report contains duration, sample rate, peak and RMS (linear and dBFS), clipped and non-finite sample counts, silent fraction, a 360-point peak waveform, section times, `loudness` (integrated LUFS after mastering), `loudnessGainDb`, `limitedFraction` (share of the track the limiter turns down by more than 3 dB), warnings, arrangement `suggestions`, `revision` and `source`. Signal measurements diagnose problems; they do not judge music.
@@ -61,14 +68,19 @@ Errors:
 - Cancellation through `signal` or a `false` progress result throws `AbortError`.
 - Audio with non-finite or full-scale samples throws an error carrying `.report`.
 - A speech recipe missing from the cache with `synthesize: false` throws, naming the words and voice.
+- A recorded instrument whose pack is not installed throws `MissingSamplesError` (`code: 'samples_missing'`, `packs`).
 
 ## Identities
 
-**Engine hash.** SHA-256 over a manifest of `src/identity.js`, `src/score.js`, `src/notation.js`, `src/render.js`, `src/catalog.js`, `src/speech.js`, `src/headless.js`, every `src/audio/*.js` and the built-in `assets/voices/*.wav`. Each JavaScript file is read with LF line endings. The toolkit version, CLI, studio, library, sleeve, network and documentation files do not count, so a release that changes only those keeps its engine hash. `engineManifest()` lists the files to compare when a server copies an engine release.
+**Engine hash.** SHA-256 over a manifest of `src/identity.js`, `src/score.js`, `src/notation.js`, `src/render.js`, `src/timeline.js`, `src/catalog.js`, `src/speech.js`, `src/headless.js`, every `src/audio/*.js`, the built-in `assets/voices/*.wav`, the hall impulse response `assets/reverb/hall.wav` and the sample manifest `assets/samples/samples.json`, which records the size and SHA-256 of every sample pack. Each JavaScript file is read with LF line endings. The toolkit version, CLI, studio, library, sleeve, network and documentation files do not count, so a release that changes only those keeps its engine hash. `engineManifest()` lists the files to compare when a server copies an engine release.
 
 **Revision.** The first 24 hex characters of SHA-256 over canonical JSON of `{engine, mix, sampleRate, score}`, plus the bytes of any referenced `assets/` WAV. Canonical JSON sorts object keys at every level, so key order and whitespace do not matter, but every value does. The score's title, `origin` or a saved mix all change the revision. Built-in phrases count through the engine hash. A speech recipe counts by its words and voice, not by its synthesized samples, so a server computes the same revision as the computer that rendered locally. Pass scores and mixes as parsed JSON objects; an empty object must stay `{}`, not become `[]`.
 
-**Fingerprint.** `fp1:` and SHA-256 of the compiled music: tempo, and for each sounding part its instrument, effective tone controls including defaults, sample treatment and sorted note events rounded to a millionth. It ignores metadata, ids, names, colors, sections, seed, score length, part order, part volume and pan, master volume and reverb, artwork and the mix. Parts at zero volume or without notes are left out. It also ignores values the instrument never reads: drum and sample pitch, tom pitch beyond its 35–60 range, duration on struck and plucked sounds, and sample settings an effect does not use. A score written in version 2 notation shares its fingerprint with the same notes in version 1. Fingerprints identify exact musical copies only; any changed note produces a different fingerprint. The `fp1` prefix changes if the definition ever does.
+**Fingerprint.** `fp1:` and SHA-256 of the compiled music: tempo and tempo changes, and for each sounding part its sustain pedal spans, its instrument, effective tone controls including defaults, sample treatment and sorted note events rounded to a millionth. It ignores metadata, ids, names, colors, sections, seed, score length, part order, part volume and pan, master volume and reverb, artwork and the mix. Parts at zero volume or without notes are left out. It also ignores values the instrument never reads: drum and sample pitch, tom pitch beyond its 35–60 range, duration on struck and plucked sounds, and sample settings an effect does not use. A score written in version 2 notation shares its fingerprint with the same notes in version 1. Fingerprints identify exact musical copies only; any changed note produces a different fingerprint. The `fp1` prefix changes if the definition ever does.
+
+## Recorded instruments
+
+The piano, strings, brass, guitars, electric bass and acoustic drum kit play full recordings from seven sample packs, about 4 GB together (`assets/samples/SOURCES.md`). A pack is one file of WAV recordings; `assets/samples/samples.json` maps notes to recordings, gives each recording's place in its pack and the pack's size, SHA-256 and download address (a release of the toolkit repository on GitHub). `prepareSamples(score)` downloads the packs a score needs into `samplesDir`, resumes interrupted downloads and keeps a pack only when its size and SHA-256 match; `SOUNDROO_SAMPLES_URL` points it at a mirror with the same file names, and `SOUNDROO_OFFLINE=1` stops it from downloading. A render reads each recording from its pack while the note plays, so memory stays small.
 
 ## Speech recipes
 
@@ -82,7 +94,8 @@ A server can list `speechRecipes(score)` to check the words, call `prepareSpeech
 
 | Limit | Value |
 | --- | --- |
-| Score length | 600 seconds |
+| Score length | 600 seconds, counted with tempo changes |
+| Tempo changes / pedal spans per part | 1,024 / 4,096 |
 | Parts | 64 |
 | Expanded note events | 100,000, and the same for source notes including pattern definitions |
 | Patterns per part / clips per part | 128 / 4,096 |

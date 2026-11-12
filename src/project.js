@@ -3,6 +3,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import * as engine from './headless.js';
+import { makeTimeline } from './timeline.js';
 
 export { VERSION } from './version.js';
 export const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
@@ -130,7 +131,7 @@ export function saveMix(directory, id, mix) {
 export function saveFeedback(directory, id, { text, time = 0 }) {
   const score = readScore(directory, id);
   if (typeof text !== 'string' || !text.trim() || text.length > 4000) throw new Error('Write a note between 1 and 4,000 characters.');
-  const duration = readCurrent(directory, id)?.duration ?? score.beats * 60 / score.bpm + 10;
+  const duration = readCurrent(directory, id)?.duration ?? scoreTimeline(score).duration + 10;
   if (!Number.isFinite(time) || time < 0 || time > duration + 1) throw new Error('Choose a time inside the track.');
   const entry = { id: crypto.randomBytes(8).toString('hex'), text: text.trim(), time, date: new Date().toISOString() };
   const entries = readJson(trackPath(directory, id, 'feedback.json'), []); entries.push(entry);
@@ -158,25 +159,35 @@ export function readRequests(directory) {
   return fs.readdirSync(dir).filter(n => n.endsWith('.json')).sort().reverse().map(n => ({ ...readJson(path.join(dir, n)), path: path.join(dir, n) }));
 }
 
+// Beats to seconds for a stored score; a score that does not compile plays at its bpm.
+function scoreTimeline(score) {
+  try { return makeTimeline(engine.compile(score)); } catch { return makeTimeline({ bpm: score.bpm > 0 ? score.bpm : 120, beats: score.beats > 0 ? score.beats : 0 }); }
+}
+
 export function trackInfo(directory, id, { detail = false } = {}) {
   const score = readScore(directory, id), mix = readMix(directory, id), current = readCurrent(directory, id);
   const state = readJson(trackPath(directory, id, 'state.json'), {});
   const versions = readVersions(directory, id).map(v => ({ ...v, audioUrl: `/api/tracks/${id}/versions/${v.id}/audio` }));
   const report = current ? readJson(trackPath(directory, id, 'renders', current.id + '.report.json'), {}) : {};
-  const seconds = 60 / score.bpm;
+  const timeline = scoreTimeline(score);
   const info = {
     id, title: score.title, description: score.description ?? '', genre: score.genre ?? '', mood: score.mood ?? '', bpm: score.bpm, key: score.key ?? '',
-    duration: current?.duration ?? score.beats * seconds, rendered: Boolean(current && fs.existsSync(trackPath(directory, id, 'renders', current.id + '.wav'))),
+    duration: current?.duration ?? timeline.duration, rendered: Boolean(current && fs.existsSync(trackPath(directory, id, 'renders', current.id + '.wav'))),
     favorite: Boolean(state.favorite), origin: score.origin ?? 'personal', audioUrl: `/api/tracks/${id}/audio`, artworkUrl: `/api/tracks/${id}/artwork`,
     waveform: report.waveform ?? [], revision: current?.id ?? null, versions,
-    sections: (score.sections ?? []).map(s => ({ id: s.id, name: s.name, start: s.beat * seconds, end: (s.beat + s.beats) * seconds })),
+    sections: (score.sections ?? []).map(s => ({ id: s.id, name: s.name, start: timeline.seconds(s.beat), end: timeline.seconds(s.beat + s.beats) })),
     parts: (score.parts ?? []).map((p, i) => ({ id: p.id, name: p.name ?? p.id, instrument: p.instrument, volume: mix.parts?.[p.id]?.volume ?? p.volume ?? 1, pan: mix.parts?.[p.id]?.pan ?? p.pan ?? 0, mute: mix.parts?.[p.id]?.mute ?? false, solo: mix.parts?.[p.id]?.solo ?? false, color: p.color ?? ['#ef946b', '#a9bce8', '#b9d0ac', '#b69ccf', '#e2ce87'][i % 5] })),
   };
   if (detail) {
     Object.assign(info, { score, mix: { ...mix, master: { volume: score.master?.volume ?? 0.8, ...mix.master } }, report, feedback: readJson(trackPath(directory, id, 'feedback.json'), []) });
-    // The studio draws version 2 pattern strings from their compiled notes.
-    if (score.version === 2) {
-      try { const expanded = engine.compile(score); info.arrangement = { bpm: expanded.bpm, parts: expanded.parts.map(({ id: part, name, notes }) => ({ id: part, name, notes })) }; } catch { /* invalid scores show parts without notes */ }
+    // The studio draws version 2 pattern strings from their compiled notes, and version 3 notes at their
+    // times in seconds, which tempo changes move.
+    if (score.version === 2 || score.version === 3) {
+      try {
+        const expanded = engine.compile(score);
+        const placed = notes => timeline.constant ? notes : notes.map(n => ({ pitch: n.pitch, time: timeline.seconds(n.beat), length: timeline.seconds(n.beat + n.duration) - timeline.seconds(n.beat), velocity: n.velocity }));
+        info.arrangement = { bpm: expanded.bpm, parts: expanded.parts.map(({ id: part, name, notes }) => ({ id: part, name, notes: placed(notes) })) };
+      } catch { /* invalid scores show parts without notes */ }
     }
   }
   return info;
@@ -202,6 +213,8 @@ export async function renderTrack(directory, id, { sampleRate = 44100, stems = f
   const cached = fs.existsSync(wavFile) && fs.existsSync(reportFile) && (!stems || fs.existsSync(stemsDir));
   let report;
   if (!cached) {
+    // The recorded instruments' packs are downloaded the first time a track needs them.
+    if (sound === 'recorded') await engine.prepareSamples(score, { log });
     const result = await engine.render(score, { sampleRate, mix, projectDir: libraryPath(directory), stems, progress, sound, speech: { log } });
     report = result.report;
     const temporary = wavFile + '.tmp'; fs.writeFileSync(temporary, result.wav, { mode: 0o600 }); fs.renameSync(temporary, wavFile);

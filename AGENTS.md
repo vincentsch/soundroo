@@ -43,7 +43,7 @@ Read the person's words and decide the normal things yourself: style, tempo, ins
 
    Never overwrite or delete an existing library. The built-in example collection (Turn It Up) is a demonstration, not the person's music.
 
-3. **Write the score.** Use version 2 scores with compact `steps` and `line` patterns placed with `clips`, or write a small script in the library that builds the score with the helpers in `src/compose.js`. Plan the sections and where the energy goes before writing notes. Keep the score and any script in the library so the music stays editable.
+3. **Write the score.** Use version 2 scores with compact `steps` and `line` patterns placed with `clips`, or write a small script in the library that builds the score with the helpers in `src/compose.js`. Plan the sections and where the energy goes before writing notes. Keep the score and any script in the library so the music stays editable. For piano music and anything that should breathe, use a version 3 score: pedal each harmony with `pedal` spans and shape the time with `tempo` changes (a ritardando into the ending). Shape dynamics note by note with velocity; the piano's sixteen recorded layers make soft notes sound soft, not just quiet. If you'd rather write MIDI with a script, `node bin/soundroo.js import-midi <file.mid> --add --library library/<name>` turns it into a score.
 
 4. **Check and add it.**
 
@@ -59,6 +59,8 @@ Read the person's words and decide the normal things yourself: style, tempo, ins
    ```bash
    node bin/soundroo.js render --all --library library/<name> --json
    ```
+
+   The first render with recorded instruments downloads their recordings once (up to about 4 GB, a few minutes; the piano alone is 2 GB). Give that command a long timeout or run `node bin/soundroo.js samples --all` in the background first. If a download is interrupted, running the command again continues it.
 
    Read the report. Fix every warning. Act on the `suggestions` too (drums that come in late, four bars that repeat unchanged for too long, sections that all sound the same, a long silent ending) unless the person asked for exactly that. Every render is mastered to the same loudness, so don't raise the master volume to make it louder. These checks find technical and arrangement problems; they can't tell you whether it sounds good. You can't hear the music, so don't claim it sounds great.
 

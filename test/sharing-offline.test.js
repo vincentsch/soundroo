@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { defaultSamplesDir } from '../src/audio/library.js';
 import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { score, tempDir } from './fixtures/sharing.js';
@@ -11,8 +12,9 @@ const cli = path.join(root, 'bin', 'soundroo.js');
 // --import takes a URL; a bare Windows path would not load.
 const preload = pathToFileURL(path.join(root, 'test', 'fixtures', 'no-network.mjs')).href;
 
+// The recorded instruments come from the packs already installed for the test run (renders read them, never download).
 function isolatedEnv(home) {
-  const env = { PATH: process.env.PATH, HOME: home, USERPROFILE: home, XDG_CONFIG_HOME: path.join(home, '.config'), APPDATA: path.join(home, 'AppData'), LOCALAPPDATA: path.join(home, 'AppData'), SOUNDROO_CACHE: path.join(home, '.cache', 'soundroo'), SystemRoot: process.env.SystemRoot };
+  const env = { PATH: process.env.PATH, HOME: home, USERPROFILE: home, XDG_CONFIG_HOME: path.join(home, '.config'), APPDATA: path.join(home, 'AppData'), LOCALAPPDATA: path.join(home, 'AppData'), SOUNDROO_CACHE: path.join(home, '.cache', 'soundroo'), SOUNDROO_SAMPLES_DIR: defaultSamplesDir(), SystemRoot: process.env.SystemRoot };
   return Object.fromEntries(Object.entries(env).filter(([, value]) => value !== undefined));
 }
 

@@ -1,8 +1,9 @@
 import { getCatalog, SAMPLE_ASSETS, SAMPLE_EFFECTS, SCORE_LIMITS, SPEECH_VOICES, DEFAULT_SPEECH_VOICE } from './catalog.js';
 import { parsePitch, parseLine, parseSteps } from './notation.js';
+import { makeTimeline } from './timeline.js';
 
 export { parsePitch };
-export const SCORE_VERSIONS = Object.freeze([1, 2]);
+export const SCORE_VERSIONS = Object.freeze([1, 2, 3]);
 const slug = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const object = value => value !== null && typeof value === 'object' && !Array.isArray(value);
 const instruments = new Map(getCatalog().instruments.map(item => [item.id, item]));
@@ -10,9 +11,10 @@ const instruments = new Map(getCatalog().instruments.map(item => [item.id, item]
 // Speech text is compared and cached after collapsing whitespace.
 export function speechText(text) { return text.trim().replace(/\s+/g, ' '); }
 
-// Version 2 adds pattern strings (see notation.js). Both versions compile to
-// the same ordinary version 1 note lists; older engines refuse version 2
-// instead of silently dropping the notes its strings describe.
+// Version 2 adds pattern strings (see notation.js). Version 3 adds tempo
+// changes and the sustain pedal (see timeline.js). Every version compiles to
+// the same ordinary note lists; older engines refuse a newer version instead
+// of silently dropping what it describes.
 function normalize(score) {
   const issues = [];
   const issue = (path, message) => issues.push({ path, message });
@@ -31,11 +33,32 @@ function normalize(score) {
     return value;
   };
   if (!object(score)) return { issues: [{ path: '$', message: 'Expected a score object.' }] };
-  if (!SCORE_VERSIONS.includes(score.version)) issue('version', 'Use score version 1, or version 2 for pattern strings.');
-  const compact = score.version === 2;
+  if (!SCORE_VERSIONS.includes(score.version)) issue('version', 'Use score version 1, version 2 for pattern strings, or version 3 for those plus tempo changes and the sustain pedal.');
+  const compact = score.version === 2 || score.version === 3;
+  const expressive = score.version === 3;
   const bpm = number(score.bpm, 'bpm', 20, 400);
-  const beats = number(score.beats, 'beats', 0, SCORE_LIMITS.maxSeconds * bpm / 60, undefined, true);
-  const out = { version: 1, id: id(score.id, 'id'), title: text(score.title, 'title'), description: text(score.description, 'description'), genre: text(score.genre, 'genre'), mood: text(score.mood, 'mood'), key: text(score.key, 'key'), bpm, beats, seed: number(score.seed, 'seed', 0, 0xffffffff, 1), master: {}, sections: [], parts: [] };
+  const beats = number(score.beats, 'beats', 0, SCORE_LIMITS.maxSeconds * 400 / 60, undefined, true);
+  const out = { version: 1, id: id(score.id, 'id'), title: text(score.title, 'title'), description: text(score.description, 'description'), genre: text(score.genre, 'genre'), mood: text(score.mood, 'mood'), key: text(score.key, 'key'), bpm, beats, tempo: [], seed: number(score.seed, 'seed', 0, 0xffffffff, 1), master: {}, sections: [], parts: [] };
+  // An empty tempo list or pedal list changes nothing, so any version may carry one (compiled scores do).
+  if (score.tempo !== undefined && !(Array.isArray(score.tempo) && !score.tempo.length)) {
+    if (!expressive) issue('tempo', 'Tempo changes need score version 3.');
+    else if (!Array.isArray(score.tempo) || score.tempo.length > SCORE_LIMITS.maxTempoChanges) issue('tempo', `Expected an array of up to ${SCORE_LIMITS.maxTempoChanges} tempo changes {beat, bpm, ramp}.`);
+    else {
+      let previous = 0;
+      for (const [i, change] of score.tempo.entries()) {
+        const path = `tempo[${i}]`;
+        if (!object(change)) { issue(path, 'Expected a tempo change {beat, bpm, ramp}.'); continue; }
+        for (const key of Object.keys(change)) if (!['beat', 'bpm', 'ramp'].includes(key)) issue(`${path}.${key}`, 'A tempo change has beat, bpm and an optional ramp.');
+        const at = number(change.beat, `${path}.beat`, 0, beats, undefined, true);
+        if (at <= previous) issue(`${path}.beat`, 'Tempo changes need increasing beats after beat 0; the score\'s bpm sets the tempo at beat 0.');
+        previous = Math.max(previous, at);
+        if (change.ramp !== undefined && typeof change.ramp !== 'boolean') issue(`${path}.ramp`, 'ramp is true (glide to this tempo) or false (change at this beat).');
+        out.tempo.push({ beat: at, bpm: number(change.bpm, `${path}.bpm`, 20, 400), ramp: change.ramp === true });
+      }
+    }
+  }
+  const timeline = makeTimeline(out);
+  if (Number.isFinite(beats) && Number.isFinite(timeline.duration) && timeline.duration > SCORE_LIMITS.maxSeconds + 1e-6) issue('beats', `The score lasts ${Math.round(timeline.duration)} seconds; scores can last up to ${SCORE_LIMITS.maxSeconds / 60} minutes.`);
   if (!out.title.trim()) issue('title', 'A score needs a title.');
   if (!Number.isInteger(out.seed)) issue('seed', 'Expected an integer seed.');
   const master = score.master ?? {};
@@ -77,6 +100,20 @@ function normalize(score) {
       return [{ pitch, beat, duration, velocity }];
     });
   };
+  // Sustain pedal: {beat, beats} spans in which the pedal is down (score version 3).
+  const pedalSpans = (list, path, end) => {
+    if (list === undefined || (Array.isArray(list) && !list.length)) return [];
+    if (!expressive) { issue(path, 'The sustain pedal needs score version 3.'); return []; }
+    if (!Array.isArray(list) || list.length > SCORE_LIMITS.maxPedalSpans) { issue(path, `Expected an array of up to ${SCORE_LIMITS.maxPedalSpans} pedal spans {beat, beats}.`); return []; }
+    return list.flatMap((span, i) => {
+      const p = `${path}[${i}]`;
+      if (!object(span)) { issue(p, 'Expected a pedal span {beat, beats}.'); return []; }
+      for (const key of Object.keys(span)) if (key !== 'beat' && key !== 'beats') issue(`${p}.${key}`, 'A pedal span has beat and beats.');
+      const at = number(span.beat, `${p}.beat`, 0, end), length = number(span.beats, `${p}.beats`, 0, end, undefined, true);
+      if (at + length > end + 1e-8) issue(p, 'Pedal span extends past its score or pattern ending.');
+      return [{ beat: at, beats: length }];
+    });
+  };
   const strings = (pattern, path, end) => {
     const fields = ['line', 'steps'].filter(field => pattern[field] !== undefined);
     if (!compact) { for (const field of fields) issue(`${path}.${field}`, 'Pattern strings need score version 2.'); return []; }
@@ -113,7 +150,7 @@ function normalize(score) {
     if (!object(part)) { issue(path, 'Expected a part object.'); continue; }
     const preset = instruments.get(part.instrument);
     if (!preset) issue(`${path}.instrument`, 'Unknown instrument. Use getCatalog() to discover presets.');
-    const p = { id: id(part.id, `${path}.id`), name: text(part.name, `${path}.name`, part.id), instrument: part.instrument, volume: number(part.volume, `${path}.volume`, 0, 2, 1), pan: number(part.pan, `${path}.pan`, -1, 1, 0), color: text(part.color, `${path}.color`, '#8aaea0'), tone: {}, notes: notes(part.notes, `${path}.notes`, beats) };
+    const p = { id: id(part.id, `${path}.id`), name: text(part.name, `${path}.name`, part.id), instrument: part.instrument, volume: number(part.volume, `${path}.volume`, 0, 2, 1), pan: number(part.pan, `${path}.pan`, -1, 1, 0), color: text(part.color, `${path}.color`, '#8aaea0'), tone: {}, notes: notes(part.notes, `${path}.notes`, beats), pedal: pedalSpans(part.pedal, `${path}.pedal`, beats) };
     if (partIds.has(part.id)) issue(`${path}.id`, 'Part IDs must be unique.');
     partIds.add(part.id);
     for (const field of ['line', 'steps']) if (part[field] !== undefined) issue(`${path}.${field}`, 'Put line and steps strings in a named pattern (score version 2), then place it with a clip.');
@@ -135,7 +172,7 @@ function normalize(score) {
         const length = number(pattern.beats, `${pp}.beats`, 0, beats, undefined, true);
         const patternNotes = notes(pattern.notes, `${pp}.notes`, length);
         patternNotes.push(...strings(pattern, pp, length));
-        patternMap.set(name, { beats: length, notes: patternNotes });
+        patternMap.set(name, { beats: length, notes: patternNotes, pedal: pedalSpans(pattern.pedal, `${pp}.pedal`, length) });
       }
     }
     const clips = part.clips ?? [];
@@ -154,16 +191,21 @@ function normalize(score) {
       if (!Number.isInteger(transpose)) issue(`${cp}.transpose`, 'Expected an integer semitone transposition.');
       if (beat + pattern.beats * repeat > beats + 1e-8) issue(cp, 'Clip extends past the score ending.');
       if (eventCount + p.notes.length + pattern.notes.length * repeat > SCORE_LIMITS.maxEvents) { issue(cp, 'Expanded score exceeds 100000 events.'); continue; }
-      for (let r = 0; r < repeat; r++) for (const n of pattern.notes) {
-        const expanded = { ...n, pitch: n.pitch + transpose, beat: beat + r * pattern.beats + n.beat, velocity: n.velocity * velocity };
-        if (expanded.pitch < 0 || expanded.pitch > 127) issue(cp, 'Transposed pitch falls outside MIDI 0–127.');
-        if (expanded.velocity > 1) issue(cp, 'Scaled note velocity exceeds 1.');
-        p.notes.push(expanded);
+      for (let r = 0; r < repeat; r++) {
+        for (const n of pattern.notes) {
+          const expanded = { ...n, pitch: n.pitch + transpose, beat: beat + r * pattern.beats + n.beat, velocity: n.velocity * velocity };
+          if (expanded.pitch < 0 || expanded.pitch > 127) issue(cp, 'Transposed pitch falls outside MIDI 0–127.');
+          if (expanded.velocity > 1) issue(cp, 'Scaled note velocity exceeds 1.');
+          p.notes.push(expanded);
+        }
+        for (const span of pattern.pedal) p.pedal.push({ beat: beat + r * pattern.beats + span.beat, beats: span.beats });
       }
     }
     eventCount += p.notes.length;
     if (eventCount > SCORE_LIMITS.maxEvents) issue(`${path}.notes`, 'Expanded score exceeds 100000 events.');
     p.notes.sort((a, b) => a.beat - b.beat || a.pitch - b.pitch);
+    p.pedal = mergePedal(p.pedal);
+    if (p.pedal.length > SCORE_LIMITS.maxPedalSpans) issue(`${path}.pedal`, `Use at most ${SCORE_LIMITS.maxPedalSpans} pedal spans per part, including clips.`);
     if (part.instrument === 'sample') {
       const sample = part.sample;
       if (!object(sample)) issue(`${path}.sample`, 'Sample parts need a sample configuration.');
@@ -192,7 +234,22 @@ function normalize(score) {
     } else if (part.sample !== undefined) issue(`${path}.sample`, 'Sample configuration requires the sample instrument.');
     out.parts.push(p);
   }
+  // The compiled score says version 3 only when it uses tempo changes or the pedal, so it compiles again as itself.
+  if (out.tempo.length || out.parts.some(part => part.pedal.length)) out.version = 3;
   return { normalized: out, issues };
+}
+
+// Overlapping spans join; spans that only touch stay apart, because lifting
+// and pressing the pedal again between them lets the dampers fall for a moment.
+function mergePedal(spans) {
+  const sorted = spans.map(span => ({ ...span })).sort((a, b) => a.beat - b.beat || a.beats - b.beats);
+  const merged = [];
+  for (const span of sorted) {
+    const last = merged[merged.length - 1];
+    if (last && span.beat < last.beat + last.beats - 1e-9) last.beats = Math.max(last.beats, span.beat + span.beats - last.beat);
+    else merged.push(span);
+  }
+  return merged;
 }
 
 export function validateScore(score) {

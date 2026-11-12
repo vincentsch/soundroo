@@ -19,8 +19,9 @@ import { getCatalog } from './catalog.js';
 import { audibleNote, audibleSample } from './render.js';
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
-const ENGINE_FILES = ['src/identity.js', 'src/catalog.js', 'src/headless.js', 'src/notation.js', 'src/render.js', 'src/score.js', 'src/speech.js'];
-const ENGINE_FOLDERS = [['src/audio', '.js'], ['assets/voices', '.wav'], ['assets/samples', '.wav'], ['assets/samples', '.json']];
+const ENGINE_FILES = ['src/identity.js', 'src/catalog.js', 'src/headless.js', 'src/notation.js', 'src/render.js', 'src/score.js', 'src/speech.js', 'src/timeline.js'];
+// The sample manifest carries the size and SHA-256 of every sample pack, so it binds the engine to the exact recordings.
+const ENGINE_FOLDERS = [['src/audio', '.js'], ['assets/voices', '.wav'], ['assets/samples', '.json'], ['assets/reverb', '.wav']];
 const presets = new Map(getCatalog().instruments.map(preset => [preset.id, preset]));
 const sha256 = data => crypto.createHash('sha256').update(data).digest('hex');
 
@@ -67,11 +68,15 @@ const byValues = (a, b) => {
 };
 export function musicFingerprint(score) {
   const expanded = compileScore(score);
+  // Tempo changes and the sustain pedal (score version 3) are part of the music; scores without them keep
+  // the fingerprint they had before version 3 existed.
   const parts = expanded.parts.filter(part => part.volume > 0 && part.notes.length).map(part => canonicalJson({
     instrument: part.instrument,
     tone: round(Object.fromEntries(Object.entries(presets.get(part.instrument).controls).map(([name, spec]) => [name, part.tone[name] ?? spec.default]))),
     sample: part.sample ? round(audibleSample(part.sample)) : null,
     notes: part.notes.map(note => round(Object.values(audibleNote(part.instrument, note)))).sort(byValues),
+    ...(part.pedal?.length ? { pedal: round(part.pedal.map(span => [span.beat, span.beats])) } : {}),
   })).sort();
-  return 'fp1:' + sha256(`{"bpm":${round(expanded.bpm)},"parts":[${parts.join(',')}]}`);
+  const tempo = expanded.tempo?.length ? `,"tempo":${canonicalJson(round(expanded.tempo.map(change => [change.beat, change.bpm, change.ramp])))}` : '';
+  return 'fp1:' + sha256(`{"bpm":${round(expanded.bpm)}${tempo},"parts":[${parts.join(',')}]}`);
 }

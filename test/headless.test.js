@@ -51,7 +51,7 @@ test('headless render, MIDI and revision match what the CLI and studio write', a
 
 test('the engine hash covers rendering, validation and identity source, independent of line endings', async () => {
   const manifest = soundroo.engineManifest().map(f => f.path);
-  for (const file of ['src/score.js', 'src/notation.js', 'src/render.js', 'src/catalog.js', 'src/speech.js', 'src/headless.js', 'src/identity.js', 'src/audio/synth.js', 'src/audio/midi.js', 'src/audio/sampler.js', 'assets/voices/made-of-light.wav', 'assets/samples/samples.json', 'assets/samples/piano/60-2-1.wav']) assert.ok(manifest.includes(file), file);
+  for (const file of ['src/score.js', 'src/notation.js', 'src/render.js', 'src/catalog.js', 'src/speech.js', 'src/headless.js', 'src/identity.js', 'src/audio/synth.js', 'src/audio/midi.js', 'src/audio/sampler.js', 'assets/voices/made-of-light.wav', 'assets/samples/samples.json', 'assets/reverb/hall.wav', 'src/timeline.js', 'src/audio/library.js', 'src/audio/convolution.js']) assert.ok(manifest.includes(file), file);
   for (const file of ['src/server.js', 'src/project.js', 'src/version.js', 'src/voice.js', 'src/artwork.js', 'src/compose.js', 'bin/soundroo.js', 'web/index.html', 'package.json']) assert.ok(!manifest.includes(file), file);
   assert.match(soundroo.engineHash(), /^[0-9a-f]{64}$/);
   const copy = temp('soundroo-engine-copy-');
@@ -176,10 +176,10 @@ test('engine facts, limits, artwork checks and validation errors are useful to a
   assert.equal(info.version, JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version);
   assert.equal(info.version, VERSION);
   assert.equal(info.hash, soundroo.engineHash());
-  assert.deepEqual(info.scoreVersions, [1, 2]);
+  assert.deepEqual(info.scoreVersions, [1, 2, 3]);
   assert.deepEqual(info.sounds, ['recorded', 'synthesized']);
   assert.equal(info.fingerprint, 'fp1');
-  for (const key of ['maxSeconds', 'maxParts', 'maxEvents', 'maxPatterns', 'maxClips', 'maxNotationCharacters', 'maxSpeechRecipes', 'maxSpeechCharacters', 'minSampleRate', 'maxSampleRate', 'maxSampleSeconds', 'maxSampleBytes']) assert.ok(Number.isFinite(soundroo.LIMITS[key]), key);
+  for (const key of ['maxSeconds', 'maxParts', 'maxEvents', 'maxPatterns', 'maxClips', 'maxNotationCharacters', 'maxSpeechRecipes', 'maxSpeechCharacters', 'maxTempoChanges', 'maxPedalSpans', 'minSampleRate', 'maxSampleRate', 'maxSampleSeconds', 'maxSampleBytes']) assert.ok(Number.isFinite(soundroo.LIMITS[key]), key);
   assert.match(info.speech.sha256, /^[0-9a-f]{64}$/);
   assert.deepEqual(soundroo.validateArtwork({ style: 'orbit', colors: ['#000000', '#ffffff'], seed: 3 }), { valid: true, issues: [] });
   assert.deepEqual(soundroo.validateArtwork({ style: 'photo', colors: ['red'], seed: -1, image: 'x.png' }).issues.map(i => i.path), ['artwork.image', 'artwork.style', 'artwork.colors', 'artwork.seed']);
@@ -206,5 +206,5 @@ test('studio detail draws version 2 pattern strings from compiled notes', async 
 test('the CLI reports the toolkit version and engine hash', () => {
   const result = spawnSync(process.execPath, [path.join(ROOT, 'bin/soundroo.js'), 'version'], { encoding: 'utf8' });
   assert.equal(result.status, 0);
-  assert.deepEqual(JSON.parse(result.stdout), { version: VERSION, engineHash: soundroo.engineHash(), scoreVersions: [1, 2] });
+  assert.deepEqual(JSON.parse(result.stdout), { version: VERSION, engineHash: soundroo.engineHash(), scoreVersions: [1, 2, 3] });
 });

@@ -73,7 +73,7 @@ test('pattern strings are refused where they would be ignored or lose notes', ()
   const issues = score => validateScore(score).issues;
   const v1 = compact(); v1.version = 1;
   assert.deepEqual(issues(v1).map(i => [i.path, i.message]), [['parts[0].patterns.beat.steps', 'Pattern strings need score version 2.'], ['parts[1].patterns.hook.line', 'Pattern strings need score version 2.'], ['parts[2].patterns.pedal.steps', 'Pattern strings need score version 2.']]);
-  assert.match(issues({ ...compact(), version: 3 })[0].message, /version 1, or version 2/);
+  assert.match(issues({ ...compact(), version: 4 })[0].message, /version 1, version 2 for pattern strings, or version 3/);
   const misplaced = compact(); misplaced.parts[1].line = 'C4/1';
   assert.deepEqual(issues(misplaced).map(i => i.path), ['parts[1].line']);
   const loosePitch = compact(); loosePitch.parts[1].patterns.hook.pitch = 'C4';

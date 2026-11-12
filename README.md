@@ -57,8 +57,15 @@ note, then mixes and masters the parts into a stereo track.
 
 The engine has 32 instrument types. Grand piano, string and brass sections,
 clean and overdriven electric guitars, electric bass and an acoustic drum kit
-play recordings of real instruments (all public domain; see
-[assets/samples/SOURCES.md](assets/samples/SOURCES.md)). Electric piano, organ,
+play full recordings of real instruments in stereo: the piano has sixteen
+loudness layers per note, its natural decay and its damper and pedal sounds,
+and the drums, bass and guitars switch between several recorded takes (all
+public domain; see [assets/samples/SOURCES.md](assets/samples/SOURCES.md)).
+The recordings are about 4 GB. Soundroo downloads the ones a track needs the
+first time it plays it, once, from this repository's releases
+(`node bin/soundroo.js samples --all` gets them all ahead of time). Scores can
+use the sustain pedal and tempo changes, and `node bin/soundroo.js import-midi`
+turns any MIDI file into a score. Electric piano, organ,
 analog and FM synthesizers, pads, synth basses, bells, marimba, a drum machine
 and 8-bit chip sounds for video game music are synthesized. Short spoken phrases can become rhythmic chops, tape and grain
 textures or a vocoder robot voice. The words come from
@@ -71,7 +78,8 @@ music is good. Because the track is a score, the agent can change one part and
 keep the others. "Keep the melody, make the drums softer" works.
 
 None of this needs an account, an API key, music software or a graphics card,
-and none of it leaves your computer. Your AI agent is a separate service with
+and none of it leaves your computer. Apart from that one download of the
+recordings, it works offline. Your AI agent is a separate service with
 its own terms and prices.
 
 ## The music player
